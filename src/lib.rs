@@ -1,5 +1,5 @@
-pub mod token;
-pub mod lexer;
+mod token;
+mod lexer;
 pub mod repl;
 mod ast;
 mod parser;
@@ -7,7 +7,7 @@ mod parser;
 
 #[cfg(test)]
 mod tests {
-    use crate::token::RETURN;
+    use crate::{ast::Identifier, token::IDENT};
 
     use super::*;
     use ast::Node;
@@ -214,6 +214,7 @@ return 5;
 return 10;
 return 993322;
 ".to_string();
+    
         let l = lexer::Lexer::new(input);
         let mut p = parser::Parser::new(l);
         
@@ -236,5 +237,28 @@ return 993322;
                 panic!("stmt.token_literal is not 'return', got='{}'", return_stmt.token_literal())
             }
         });
+    }
+
+    #[test]
+    fn test_string() {
+        let program = ast::Program {
+            statements: vec![
+                Box::new(ast::LetStatement {
+                    token: token::Token { token_type: token::LET.to_string(), literal: "let".to_string() },
+                    name: ast::Identifier {
+                        token: token::Token { token_type: token::IDENT.to_string(), literal: "myVar".to_string() },
+                        value: "myVar".to_string(),
+                    },
+                    value: Some(Box::new(ast::Identifier {
+                        token: token::Token { token_type: token::IDENT.to_string(), literal: "anotherVar".to_string() },
+                        value: "anotherVar".to_string(),
+                    }))
+                }),
+            ]
+        };
+
+        if !program.to_string().eq("let myVar = anotherVar;") {
+            panic!("program.to_string() wrong. got='{}'", program.to_string())
+        }
     }
 }

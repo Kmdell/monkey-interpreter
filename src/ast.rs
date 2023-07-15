@@ -2,6 +2,7 @@ use super::token::*;
 
 pub trait Node {
     fn token_literal(&self) -> String;
+    fn to_string(&self) -> String;
 }
 
 pub trait Statement: Node {
@@ -11,6 +12,9 @@ pub trait Statement: Node {
     }
     fn into_return(&self) -> Result<&ReturnStatement, String> {
         Err("Not a ReturnStatement".into())
+    }
+    fn into_expression(&self) -> Result<&ExpressionStatement, String> {
+        Err("Not a ExpressionStatement".into())
     }
 }
 
@@ -30,6 +34,16 @@ impl Node for Program {
             return String::from("");
         }
     }
+
+    fn to_string(&self) -> String {
+        let mut buffer = String::new();
+        
+        self.statements.iter().for_each(|stmt| {
+            buffer.push_str(&stmt.to_string());
+        });
+
+        buffer
+    }
 }
 
 pub struct LetStatement {
@@ -41,6 +55,17 @@ pub struct LetStatement {
 impl Node for LetStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
+    }
+
+    fn to_string(&self) -> String {
+        let mut buffer = String::new();
+        buffer.push_str(&(self.token_literal() + " " + &self.name.to_string() + " = "));
+
+        if let Some(expression) = &self.value {
+            buffer.push_str(&expression.to_string());
+        }
+
+        buffer + ";"
     }
 }
 
@@ -59,6 +84,10 @@ impl Node for Identifier {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
     }
+
+    fn to_string(&self) -> String {
+        self.value.clone()
+    }
 }
 
 impl Expression for Identifier {}
@@ -72,10 +101,46 @@ impl Node for ReturnStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
     }
+
+    fn to_string(&self) -> String {
+        let mut buffer = String::new();
+        buffer.push_str(&self.token_literal());
+        buffer.push_str(" ");
+
+        if let Some(stmt) = &self.return_value {
+            buffer.push_str(&stmt.to_string());
+        }
+
+        buffer + ";"
+    }
 }
 
 impl Statement for ReturnStatement {
     fn into_return(&self) -> Result<&ReturnStatement, String> {
+        Ok(self)
+    }
+}
+
+pub struct ExpressionStatement {
+    pub token: Token,
+    pub expression: Option<Box<dyn Expression>>
+}
+
+impl Node for ExpressionStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn to_string(&self) -> String {
+        if let Some(expression) = &self.expression {
+            return expression.to_string();
+        }
+        return String::from("");
+    }
+}
+
+impl Statement for ExpressionStatement {
+    fn into_expression(&self) -> Result<&ExpressionStatement, String> {
         Ok(self)
     }
 }
