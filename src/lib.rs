@@ -11,6 +11,107 @@ mod tests {
 
     use super::*;
     use ast::Node;
+
+    struct IdentTest {
+        expected_identifier: String,
+    }
+
+    impl IdentTest {
+        fn new(expected_identifier: &str) -> Self {
+            IdentTest {
+                expected_identifier: expected_identifier.to_string(),
+            }
+        }
+    }
+
+
+    fn test_integer_literal(il: &Box<dyn Expression>, value: i64) {
+        let integ = il.into_integer_literal().unwrap_or_else(|x| panic!("{}", x));
+        if integ.value != value {
+            panic!("integ.value not {}, got={}", value, integ.value);
+        }
+
+        if !integ.token_literal().eq(&format!("{}", value)) {
+            panic!("integ.token_literal() not {}, got={}", value, integ.token_literal());
+        }
+    }
+
+    fn test_identifier(exp: &Box<dyn Expression>, value: String) {
+        let ident = exp.into_identifier();
+        if let Err(e) = ident {
+            panic!("{}", e);
+        }
+
+        let ident = ident.unwrap();
+        if !ident.value.eq(&value) {
+            panic!("Ident.value not {}, got ={}", value, ident.value);
+        }
+
+        if ident.token_literal() != value {
+            panic!("ident.token_literal not {}, got={}", value, ident.token_literal());
+        }
+    }
+
+    fn test_let_statements(stmt: &Box<dyn ast::Statement>, test: IdentTest) {
+        if !stmt.token_literal().eq("let") {
+            panic!("s.token_literal is not 'let'. got={}", stmt.token_literal()); 
+        }
+
+        let let_stmt = stmt.into_let().unwrap_or_else(|x| panic!("s is not a LetStatement, got={}", x));
+
+        if !let_stmt.name.value.eq(&test.expected_identifier) {
+            panic!("let_stmt.value.name not '{}', got='{}'", test.expected_identifier, let_stmt.name.value);
+        }
+
+        if !let_stmt.name.token_literal().eq(&test.expected_identifier) {
+            panic!("let_stmt.name.token_literal() not '{}', got='{}'", test.expected_identifier, let_stmt.name.token_literal());
+        }
+    }
+
+    fn check_parser_errors(program: &parser::Parser) {
+        let errors = program.errors();
+        if errors.is_empty() {
+            return;
+        }
+
+        eprintln!("Parser had {} errors", errors.len());
+        errors.iter().for_each(|error| eprintln!("{}", error));
+        panic!("Parser ran into errors");
+    }
+
+    fn test_literal_expression(exp: &Box<dyn Expression>, expected: String) {
+        if let Ok(int) = expected.parse::<i64>() {
+            test_integer_literal(&exp, int);
+        } else if let Ok(boolean) = expected.parse::<bool>() {
+            test_boolean_literal(&exp, boolean);
+        } else {
+            test_identifier(&exp, expected);
+        }
+    }
+
+    fn test_infix_expression(exp: &Box<dyn Expression>, left: String, operator: String, right: String) {
+        let op_exp = exp.into_infix().unwrap_or_else(|e| panic!("{}", e));
+
+        test_literal_expression(op_exp.left.as_ref().unwrap(), left);
+
+        if !op_exp.operator.eq(&operator) {
+            panic!("exp.operator is not {}, got={}", operator, op_exp.operator);
+        }
+
+        test_literal_expression(op_exp.right.as_ref().unwrap(), right);
+    }
+
+    fn test_boolean_literal(exp: &Box<dyn Expression>, value: bool) {
+        let bo = exp.into_bool().unwrap_or_else(|e| panic!("{}", e));
+
+        if bo.value != value {
+            panic!("bo.value not {}, got={}", value, bo.value);
+        }
+
+        if !bo.token_literal().eq(&value.to_string()) {
+            panic!("bo.token_literal not {}, got={}", value, bo.token_literal());
+        }
+    }
     
     #[test]
     fn test_next_token() {
@@ -138,7 +239,7 @@ if (5 < 10) {
     }
 
     #[test]
-    pub fn test_let_statement_parsing() {
+    fn test_let_statement_parsing() {
         let input = "
 let x = 5;
 let y = 10;
@@ -159,52 +260,13 @@ let foobar = 838383;
             panic!("program.statements does not contain 3 statements, instead got {}", program.statements.len());
         }
         
-        let tests: Vec<Test> = ["x", "y", "foobar"].iter().map(|x| Test::new(x)).collect();
+        let tests: Vec<IdentTest> = ["x", "y", "foobar"].iter().map(|x| IdentTest::new(x)).collect();
 
         tests.into_iter().enumerate().for_each(|(i, test)| {
             let stmt = program.statements.get(i).unwrap();
             test_let_statements(stmt, test);
         });
         
-    }
-
-    struct Test {
-        expected_identifier: String,
-    }
-
-    impl Test {
-        fn new(expected_identifier: &str) -> Self {
-            Test {
-                expected_identifier: expected_identifier.to_string(),
-            }
-        }
-    }
-
-    fn test_let_statements(stmt: &Box<dyn ast::Statement>, test: Test) {
-        if !stmt.token_literal().eq("let") {
-            panic!("s.token_literal is not 'let'. got={}", stmt.token_literal()); 
-        }
-
-        let let_stmt = stmt.into_let().unwrap_or_else(|x| panic!("s is not a LetStatement, got={}", x));
-
-        if !let_stmt.name.value.eq(&test.expected_identifier) {
-            panic!("let_stmt.value.name not '{}', got='{}'", test.expected_identifier, let_stmt.name.value);
-        }
-
-        if !let_stmt.name.token_literal().eq(&test.expected_identifier) {
-            panic!("let_stmt.name.token_literal() not '{}', got='{}'", test.expected_identifier, let_stmt.name.token_literal());
-        }
-    }
-
-    fn check_parser_errors(program: &parser::Parser) {
-        let errors = program.errors();
-        if errors.is_empty() {
-            return;
-        }
-
-        eprintln!("Parser had {} errors", errors.len());
-        errors.iter().for_each(|error| eprintln!("{}", error));
-        panic!("Parser ran into errors");
     }
 
     #[test]
@@ -283,7 +345,7 @@ return 993322;
         let exp_stmt = program.statements[0].into_expression().unwrap_or_else(|x| panic!("stmt is not an ExpressionStatement, got='{}'", x));
 
         if let Some(exp) = &exp_stmt.expression {
-            let ident = exp.into_identifer().unwrap_or_else(|_| panic!("Expression is not an Identifier"));
+            let ident = exp.into_identifier().unwrap_or_else(|_| panic!("Expression is not an Identifier"));
             if !ident.value.eq("foobar") {
                 panic!("ident.value is not '{}' got='{}'", "foobar", ident.value);
             }
@@ -331,18 +393,20 @@ return 993322;
         struct PrefixTest {
             input: String,
             operator: String,
-            integer_value: i64, 
+            value: String, 
         }
 
         impl PrefixTest {
-            fn new(input: String, operator: String, integer_value: i64) -> Self {
-                PrefixTest { input, operator, integer_value }
+            fn new(input: String, operator: String, value: String) -> Self {
+                PrefixTest { input, operator, value }
             }
         }
 
         let prefix_tests = vec![
-            PrefixTest::new("!5".into(), "!".into(), 5),
-            PrefixTest::new("-15".into(), "-".into(), 15)
+            PrefixTest::new("!5".into(), "!".into(), 5.to_string()),
+            PrefixTest::new("-15".into(), "-".into(), 15.to_string()),
+            PrefixTest::new("!true;".into(), "!".into(), true.to_string()),
+            PrefixTest::new("!false;".into(), "!".into(), false.to_string())
         ];
 
         for tt in prefix_tests {
@@ -369,7 +433,7 @@ return 993322;
                 }
                 
                 if let Some(expr) = &prefix.right {
-                    test_integer_literal(&expr, tt.integer_value);
+                    test_literal_expression(&expr, tt.value);
                 } else {
                     panic!("right side of expression is none");
                 }
@@ -379,46 +443,39 @@ return 993322;
         }
     }
 
-    fn test_integer_literal(il: &Box<dyn Expression>, value: i64) {
-        let integ = il.into_integer_literal().unwrap_or_else(|x| panic!("{}", x));
-        if integ.value != value {
-            panic!("integ.value not {}, got={}", value, integ.value);
-        }
-
-        if !integ.token_literal().eq(&format!("{}", value)) {
-            panic!("integ.token_literal() not {}, got={}", value, integ.token_literal());
-        }
-    }
 
     #[test]
     fn test_parsing_infix_expression() {
         struct InfixTest {
             input: String,
-            left_value: i64,
+            left: String,
             operator: String,
-            right_value: i64,
+            right: String,
         }
 
         impl InfixTest {
-            fn new(input: String, left_value: i64, operator: String, right_value: i64) -> Self {
+            fn new(input: String, left: String, operator: String, right: String) -> Self {
                 InfixTest {
                     input,
-                    left_value,
+                    left,
                     operator,
-                    right_value
+                    right
                 }
             }
         }
 
         let infix_tests = vec![
-            InfixTest::new("5 + 5;".into(), 5, "+".into(), 5),
-            InfixTest::new("5 - 5;".into(), 5, "-".into(), 5),
-            InfixTest::new("5 * 5;".into(), 5, "*".into(), 5),
-            InfixTest::new("5 / 5;".into(), 5, "/".into(), 5),
-            InfixTest::new("5 > 5;".into(), 5, ">".into(), 5),
-            InfixTest::new("5 < 5;".into(), 5, "<".into(), 5),
-            InfixTest::new("5 == 5;".into(), 5, "==".into(), 5),
-            InfixTest::new("5 != 5;".into(), 5, "!=".into(), 5)
+            InfixTest::new("5 + 5;".into(), 5.to_string(), "+".into(), 5.to_string()),
+            InfixTest::new("5 - 5;".into(), 5.to_string(), "-".into(), 5.to_string()),
+            InfixTest::new("5 * 5;".into(), 5.to_string(), "*".into(), 5.to_string()),
+            InfixTest::new("5 / 5;".into(), 5.to_string(), "/".into(), 5.to_string()),
+            InfixTest::new("5 > 5;".into(), 5.to_string(), ">".into(), 5.to_string()),
+            InfixTest::new("5 < 5;".into(), 5.to_string(), "<".into(), 5.to_string()),
+            InfixTest::new("5 == 5;".into(), 5.to_string(), "==".into(), 5.to_string()),
+            InfixTest::new("5 != 5;".into(), 5.to_string(), "!=".into(), 5.to_string()),
+            InfixTest::new("true == true".into(), true.to_string(), "==".into(), true.to_string()),
+            InfixTest::new("false == false".into(), false.to_string(), "==".into(), false.to_string()),
+            InfixTest::new("true != false".into(), true.to_string(), "!=".into(), false.to_string())
         ];
 
         for tt in infix_tests {
@@ -437,33 +494,17 @@ return 993322;
             }
 
             let exp_stmt = program.statements[0].into_expression().unwrap_or_else(|x| panic!("{}", x));
-
-            if let Some(expr) = &exp_stmt.expression {
-                let infix = expr.into_infix().unwrap_or_else(|x| panic!("{}", x));
-                
-                if let Some(left) = &infix.left {
-                    test_integer_literal(&left, tt.left_value);
-                } else {
-                    panic!("The left side of the infix is empty");
-                }
-
-                if !infix.operator.eq(&tt.operator) {
-                    panic!("infix.operator is not '{}', got={}", tt.operator, infix.operator);
-                }
-
-                if let Some(right) = &infix.right {
-                    test_integer_literal(&right, tt.right_value);
-                } else {
-                    panic!("The right side of the infix is empty");
-                }
+            
+            if let Some(exp) = &exp_stmt.expression {
+                test_infix_expression(exp, tt.left, tt.operator, tt.right);
             } else {
-                panic!("No Expression in the ExpressionStatment");
+                panic!("There were no expressions in the statement");
             }
         }
     }
 
     #[test] 
-    fn test_operator_precendence_parsing() {
+    fn test_operator_precedence_parsing() {
         struct Test {
             input: String,
             expected: String,
@@ -526,6 +567,42 @@ return 993322;
             Test::new(
                 "3 + 4 * 5 == 3 * 1 + 4 * 5".into(),
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".into()
+            ),
+            Test::new(
+                "true".into(),
+                "true".into()
+            ),
+            Test::new(
+                "false".into(),
+                "false".into()
+            ),
+            Test::new(
+                "3 > 5 == false".into(),
+                "((3 > 5) == false)".into()
+            ),
+            Test::new(
+                "3 < 5 == true".into(),
+                "((3 < 5) == true)".into()
+            ),
+            Test::new(
+                "1 + (2 + 3) + 4".into(),
+                "((1 + (2 + 3)) + 4)".into()
+            ),
+            Test::new(
+                "(5 + 5) * 2".into(),
+                "((5 + 5) * 2)".into()
+            ),
+            Test::new(
+                "2 / (5 + 5)".into(),
+                "(2 / (5 + 5))".into()
+            ),
+            Test::new(
+                "-(5 + 5)".into(),
+                "(-(5 + 5))".into()
+            ),
+            Test::new(
+                "!(true == true)".into(),
+                "(!(true == true))".into()
             )
         ];
 
@@ -541,4 +618,5 @@ return 993322;
             }
         }
     }
+
 }

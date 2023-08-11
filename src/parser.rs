@@ -61,6 +61,9 @@ impl Parser {
 
         p.register_prefix(IDENT.to_string(), Rc::new(Parser::parse_identifier));
         p.register_prefix(INT.to_string(), Rc::new(Parser::parse_integer_literal));
+        p.register_prefix(TRUE.to_string(), Rc::new(Parser::parse_boolean));
+        p.register_prefix(FALSE.to_string(), Rc::new(Parser::parse_boolean));
+        p.register_prefix(LPAREN.to_string(), Rc::new(Parser::parse_grouped_expression));
         p.register_prefix(BANG.to_string(), Rc::new(Parser::parse_prefix_expression));
         p.register_prefix(MINUS.to_string(), Rc::new(Parser::parse_prefix_expression));
         
@@ -85,7 +88,7 @@ impl Parser {
         let mut program = Program {
             statements: vec![],   
         };
-        while !self.peek_token_is(EOF.to_string()) {
+        while !self.cur_token_is(EOF.to_string()) {
             if let Some(stmt) = self.parse_statement() {
                 program.statements.push(stmt);
             }
@@ -253,6 +256,22 @@ impl Parser {
                 value: res.unwrap(),
             }))
         }
+    }
+
+    fn parse_boolean(parser: &mut Parser) -> Option<Box<dyn Expression>> {
+        Some(Box::new(Boolean { token: parser.cur_token.clone(), value: parser.cur_token_is(TRUE.to_string()) }))
+    }
+
+    fn parse_grouped_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {
+        parser.next_token();
+
+        let exp = parser.parse_expression(LOWEST as u8);
+
+        if !parser.expect_peek(RPAREN.to_string()) {
+            return None;
+        }
+
+        exp
     }
 
     fn parse_prefix_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {

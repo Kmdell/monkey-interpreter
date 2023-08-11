@@ -20,7 +20,7 @@ pub trait Statement: Node {
 
 pub trait Expression: Node {
     fn expression_node(&self) {}
-    fn into_identifer(&self) -> Result<&Identifier, String> {
+    fn into_identifier(&self) -> Result<&Identifier, String> {
         Err("Not a Identifier".into())
     }
     fn into_integer_literal(&self) -> Result<&IntegerLiteral, String> {
@@ -31,6 +31,12 @@ pub trait Expression: Node {
     }
     fn into_infix(&self) -> Result<&InfixExpression, String> {
         Err("Not a InfixExpression".into())
+    }
+    fn into_bool(&self) -> Result<&Boolean, String> {
+        Err("Not a Boolean".into())
+    }
+    fn into_if(&self) -> Result<&IfExpression, String> {
+        Err("Not a IfExpression".into())
     }
 }
 
@@ -103,7 +109,7 @@ impl Node for Identifier {
 }
 
 impl Expression for Identifier {
-    fn into_identifer(&self) -> Result<&Identifier, String> {
+    fn into_identifier(&self) -> Result<&Identifier, String> {
         Ok(self)
     }
 }
@@ -242,5 +248,83 @@ impl Node for InfixExpression {
 impl Expression for InfixExpression {
     fn into_infix(&self) -> Result<&InfixExpression, String> {
         Ok(self)
+    }
+}
+
+pub struct Boolean {
+    pub token: Token,
+    pub value: bool
+}
+
+impl Node for Boolean {
+    fn to_string(&self) -> String {
+        println!("token literal: {}", self.token.literal);
+        self.token.literal.clone()
+    }
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+
+impl Expression for Boolean {
+    fn into_bool(&self) -> Result<&Boolean, String> {
+        Ok(self)
+    }
+}
+
+pub struct IfExpression {
+    pub token: Token,
+    pub condition: Option<Box<dyn Expression>>,
+    pub consequence: Option<Box<BlockStatement>>,
+    pub alternative: Option<Box<BlockStatement>>
+}
+
+impl Node for IfExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn to_string(&self) -> String {
+        let mut buf = String::from("if");
+        
+        if let Some(cond) = &self.condition {
+            buf.push_str(&cond.to_string());
+        }
+
+        buf.push_str(" ");
+
+        if let Some(cons) = &self.consequence {
+            buf.push_str(&cons.to_string());
+        }
+
+        if let Some(alt) = &self.alternative {
+            buf.push_str("else ");
+            buf.push_str(&alt.to_string());
+        }
+
+        buf
+    }
+}
+
+impl Expression for IfExpression {
+    fn into_if(&self) -> Result<&IfExpression, String> {
+        Ok(self)
+    }
+}
+
+pub struct BlockStatement {
+    pub token: Token,
+    pub statements: Vec<Box<dyn Statement>>
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn to_string(&self) -> String {
+        let mut buf = String::new();
+
+        self.statements.iter().for_each(|stmt| buf.push_str(&stmt.to_string()));
+
+        buf
     }
 }
