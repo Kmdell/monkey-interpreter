@@ -7,7 +7,7 @@ mod parser;
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::Expression;
+    use crate::{ast::Expression, lexer::Lexer, parser::Parser};
 
     use super::*;
     use ast::Node;
@@ -619,4 +619,81 @@ return 993322;
         }
     }
 
+    #[test]
+    fn test_if_expression() {
+        let input: String = "if (x < y) { x }".into();
+
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(&p);
+
+        let stmts = program.unwrap_or_else(|| panic!("No program is parsed")).statements;
+
+        if stmts.len() != 1 {
+            panic!("program.statments does not contain {} statements, got={}", 1, stmts.len());
+        }
+
+        let stmt = stmts[0].into_expression().unwrap_or_else(|e| panic!("{}", e));
+
+        let exp = stmt.expression.as_ref().unwrap_or_else(|| panic!("There is no expression in the statement")).into_if().unwrap_or_else(|e| panic!("{}", e));
+
+        test_infix_expression(exp.condition.as_ref().unwrap_or_else(|| panic!("There is no condition")), "x".into(), "<".into(), "y".into());
+
+        let stmts = &exp.consequence.as_ref().unwrap_or_else(|| panic!("There is no consequence")).statements;
+
+        if stmts.len() != 1 {
+            panic!("consequence is not 1 statements, got={}", stmts.len());
+        }
+
+        let consequence = stmts[0].into_expression().unwrap_or_else(|e| panic!("{}", e));
+
+        test_identifier(consequence.expression.as_ref().unwrap_or_else(|| panic!("Consequence has no expression")), "x".into());
+
+        if exp.alternative.is_some() {
+            panic!("exp.alternative.statements was not none");
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input: String = "if (x < y) { x } else { y }".into();
+
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(&p);
+
+        let stmts = program.unwrap_or_else(|| panic!("No program is parsed")).statements;
+
+        if stmts.len() != 1 {
+            panic!("program.statments does not contain {} statements, got={}", 1, stmts.len());
+        }
+
+        let stmt = stmts[0].into_expression().unwrap_or_else(|e| panic!("{}", e));
+
+        let exp = stmt.expression.as_ref().unwrap_or_else(|| panic!("There is no expression in the statement")).into_if().unwrap_or_else(|e| panic!("{}", e));
+
+        test_infix_expression(exp.condition.as_ref().unwrap_or_else(|| panic!("There is no condition")), "x".into(), "<".into(), "y".into());
+
+        let stmts = &exp.consequence.as_ref().unwrap_or_else(|| panic!("There is no consequence")).statements;
+
+        if stmts.len() != 1 {
+            panic!("consequence is not 1 statements, got={}", stmts.len());
+        }
+
+        let consequence = stmts[0].into_expression().unwrap_or_else(|e| panic!("{}", e));
+
+        test_identifier(consequence.expression.as_ref().unwrap_or_else(|| panic!("Consequence has no expression")), "x".into());
+
+        let stmts = &exp.alternative.as_ref().unwrap_or_else(|| panic!("There is no alternative")).statements;
+
+        if stmts.len() != 1 {
+            panic!("alternative is not 1 statements, got={}", stmts.len());
+        }
+
+        let alternative = stmts[0].into_expression().unwrap_or_else(|e| panic!("{}", e));
+
+        test_identifier(alternative.expression.as_ref().unwrap_or_else(|| panic!("Alternative has no expression")), "y".into());
+    }
 }

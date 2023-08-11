@@ -64,6 +64,7 @@ impl Parser {
         p.register_prefix(TRUE.to_string(), Rc::new(Parser::parse_boolean));
         p.register_prefix(FALSE.to_string(), Rc::new(Parser::parse_boolean));
         p.register_prefix(LPAREN.to_string(), Rc::new(Parser::parse_grouped_expression));
+        p.register_prefix(IF.to_string(), Rc::new(Parser::parse_if_expression));
         p.register_prefix(BANG.to_string(), Rc::new(Parser::parse_prefix_expression));
         p.register_prefix(MINUS.to_string(), Rc::new(Parser::parse_prefix_expression));
         
@@ -157,6 +158,24 @@ impl Parser {
         }
 
         Some(Box::new(stmt))
+    }
+
+    fn parse_block_statement(&mut self) -> Option<Box<BlockStatement>> {
+        let mut block = BlockStatement {
+            token: self.cur_token.clone(),
+            statements: vec![]
+        };
+
+        self.next_token();
+
+        while !self.cur_token_is(RBRACE.to_string()) && !self.cur_token_is(EOF.to_string()) {
+            if let Some(stmt) = self.parse_statement() {
+                block.statements.push(stmt);
+            }
+            self.next_token();
+        }
+
+        Some(Box::new(block))
     }
 
     fn no_prefix_parse_fn_error(&mut self, t: TokenType) {
@@ -272,6 +291,44 @@ impl Parser {
         }
 
         exp
+    }
+
+    fn parse_if_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {
+        let mut expression = IfExpression {
+            token: parser.cur_token.clone(),
+            condition: None,
+            consequence: None,
+            alternative: None
+        };
+
+        if !parser.expect_peek(LPAREN.to_string()) {
+            return None;
+        }
+
+        parser.next_token();
+        expression.condition = parser.parse_expression(LOWEST as u8);
+
+        if !parser.expect_peek(RPAREN.to_string()) {
+            return None;
+        }
+
+        if !parser.expect_peek(LBRACE.to_string()) {
+            return None;
+        }
+
+        expression.consequence = parser.parse_block_statement();
+
+        if parser.peek_token_is(ELSE.to_string()) {
+            parser.next_token();
+
+            if !parser.expect_peek(LBRACE.to_string()) {
+                return None;
+            }
+
+            expression.alternative = parser.parse_block_statement();
+        }
+
+        Some(Box::new(expression))
     }
 
     fn parse_prefix_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {

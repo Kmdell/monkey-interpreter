@@ -328,3 +328,5 @@ impl Node for BlockStatement {
         buf
     }
 }
+
+impl Statement for BlockStatement {}
