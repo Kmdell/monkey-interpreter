@@ -38,6 +38,12 @@ pub trait Expression: Node {
     fn into_if(&self) -> Result<&IfExpression, String> {
         Err("Not a IfExpression".into())
     }
+    fn into_func(&self) -> Result<&FunctionLiteral, String> {
+        Err("Not a FunctionLiteral".into())
+    }
+    fn into_call(&self) -> Result<&CallExpression, String> {
+        Err("Not a CallExpression".into())
+    }
 }
 
 pub struct Program {
@@ -330,3 +336,67 @@ impl Node for BlockStatement {
 }
 
 impl Statement for BlockStatement {}
+
+pub struct FunctionLiteral {
+    pub token: Token,
+    pub parameters: Vec<Box<dyn Expression>>,
+    pub body: Option<Box<BlockStatement>>
+}
+
+impl Node for FunctionLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn to_string(&self) -> String {
+        let mut buf = self.token_literal();
+        
+        let para: Vec<String> = self.parameters.iter().map(|p| p.to_string()).collect();
+
+        buf.push_str("(");
+    
+        buf.push_str(&(para.join(", ")));
+
+        buf.push_str(")");
+
+        buf.push_str(&self.body.as_ref().expect("There is not body for this function").to_string());
+
+        buf
+    }
+}
+
+impl Expression for FunctionLiteral {
+    fn into_func(&self) -> Result<&FunctionLiteral, String>{
+        Ok(self)
+    }
+}
+
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Option<Box<dyn Expression>>,
+    pub arguments: Vec<Box<dyn Expression>>
+}
+
+impl Node for CallExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn to_string(&self) -> String {
+        let mut buf = String::new();
+
+        let mut args = vec![];
+        self.arguments.iter().for_each(|arg| args.push(arg.to_string()));
+
+        buf.push_str(&self.function.as_ref().expect("There is no function").to_string());
+        buf.push_str("(");
+        buf.push_str(&args.join(", "));
+        buf.push_str(")");
+
+        buf
+    }
+}
+
+impl Expression for CallExpression {
+    fn into_call(&self) -> Result<&CallExpression, String> {
+        Ok(self)
+    }
+}

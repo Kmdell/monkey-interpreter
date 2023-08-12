@@ -54,6 +54,7 @@ impl Parser {
                 (MINUS.into(), Precedence::SUM),
                 (SLASH.into(), Precedence::PRODUCT),
                 (ASTERICK.into(), Precedence::PRODUCT),
+                (LPAREN.into(), Precedence::CALL),
             ]),
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
@@ -65,9 +66,11 @@ impl Parser {
         p.register_prefix(FALSE.to_string(), Rc::new(Parser::parse_boolean));
         p.register_prefix(LPAREN.to_string(), Rc::new(Parser::parse_grouped_expression));
         p.register_prefix(IF.to_string(), Rc::new(Parser::parse_if_expression));
+        p.register_prefix(FUNCTION.to_string(), Rc::new(Parser::parse_function_literal));
         p.register_prefix(BANG.to_string(), Rc::new(Parser::parse_prefix_expression));
         p.register_prefix(MINUS.to_string(), Rc::new(Parser::parse_prefix_expression));
         
+        p.register_infix(LPAREN.to_string(), Rc::new(Parser::parse_call_expression));
         p.register_infix(PLUS.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(MINUS.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(SLASH.to_string(), Rc::new(Parser::parse_infix_expression));
@@ -111,7 +114,8 @@ impl Parser {
         if !self.expect_peek(IDENT.to_string()) {
             return None;
         }
-        let stmt = LetStatement {
+
+        let mut stmt = LetStatement {
             token: cur_token,
             name: Identifier {
                 token: self.cur_token.clone(),
@@ -124,22 +128,28 @@ impl Parser {
             return None;
         }
 
-        while !self.cur_token_is(SEMICOLON.to_string()) {
+        self.next_token();
+
+        stmt.value = self.parse_expression(LOWEST as u8);
+
+        if self.peek_token_is(SEMICOLON.to_string()) {
             self.next_token();
         }
+
         Some(Box::new(stmt))
     }
 
     fn parse_return_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let cur_token = self.cur_token.clone();
-        let stmt = ReturnStatement {
-            token: cur_token,
+        let mut stmt = ReturnStatement {
+            token: self.cur_token.clone(),
             return_value: None,
         };
 
         self.next_token();
 
-        while !self.cur_token_is(SEMICOLON.to_string()) {
+        stmt.return_value = self.parse_expression(LOWEST as u8);
+
+        if self.peek_token_is(SEMICOLON.to_string()) {
             self.next_token();
         }
 
@@ -176,6 +186,63 @@ impl Parser {
         }
 
         Some(Box::new(block))
+    }
+
+    fn parse_function_parameters(&mut self) -> Vec<Box<dyn Expression>> {
+        let mut idents = vec![];
+        
+        if self.peek_token_is(RPAREN.to_string()) {
+            self.next_token();
+            return idents;
+        }
+
+        self.next_token();
+
+        let ident = Identifier {
+            token: self.cur_token.clone(),
+            value: self.cur_token.literal.clone()
+        };
+        idents.push(Box::new(ident));
+
+        while self.peek_token_is(COMMA.to_string()) {
+            self.next_token();
+            self.next_token();
+            let ident = Identifier {
+                token: self.cur_token.clone(),
+                value: self.cur_token.literal.clone()
+            };
+            idents.push(Box::new(ident));
+        }
+
+        if !self.expect_peek(RPAREN.to_string()) {
+            return vec![];
+        }
+
+        idents
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Box<dyn Expression>> {
+        let mut args = vec![];
+
+        if self.peek_token_is(RPAREN.to_string()) {
+            self.next_token();
+            return args;
+        }
+
+        self.next_token();
+        args.push(self.parse_expression(LOWEST as u8).expect("Nothing was parsed"));
+
+        while self.peek_token_is(COMMA.to_string()) {
+            self.next_token();
+            self.next_token();
+            args.push(self.parse_expression(LOWEST as u8).expect("Nothing was parsed"));
+        }
+
+        if !self.expect_peek(RPAREN.to_string()) {
+            return vec![];
+        }
+
+        args
     }
 
     fn no_prefix_parse_fn_error(&mut self, t: TokenType) {
@@ -331,6 +398,28 @@ impl Parser {
         Some(Box::new(expression))
     }
 
+    fn parse_function_literal(parser: &mut Parser) -> Option<Box<dyn Expression>> {
+        let cur_token = parser.cur_token.clone();
+
+        if !parser.expect_peek(LPAREN.to_string()) {
+            return None;
+        }
+
+        let parameters = parser.parse_function_parameters();
+
+        if !parser.expect_peek(LBRACE.to_string()) {
+            return None;
+        }
+
+        let lit = FunctionLiteral {
+            token: cur_token,
+            parameters,
+            body: parser.parse_block_statement()
+        };
+
+        Some(Box::new(lit))
+    }
+
     fn parse_prefix_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {
         let cur_token = parser.cur_token.clone();
         let literal = parser.cur_token.literal.clone();
@@ -342,6 +431,17 @@ impl Parser {
             operator: literal,
             right: parser.parse_expression(PREFIX as u8),
         }))
+    }
+
+    fn parse_call_expression(parser: &mut Parser, function: Option<Box<dyn Expression>>) -> Option<Box<dyn Expression>> {
+        let mut exp = CallExpression {
+            token: parser.cur_token.clone(),
+            function,
+            arguments: vec![]
+        };
+        exp.arguments = parser.parse_call_arguments();
+
+        Some(Box::new(exp))
     }
 
     fn parse_infix_expression(parser: &mut Parser, left: Option<Box<dyn Expression>>) -> Option<Box<dyn Expression>> {
