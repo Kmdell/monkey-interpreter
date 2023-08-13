@@ -3,10 +3,6 @@ use super::token::*;
 pub trait Node {
     fn token_literal(&self) -> String;
     fn to_string(&self) -> String;
-}
-
-pub trait Statement: Node {
-    fn statement_node(&self) {}
     fn into_let(&self) -> Result<&LetStatement, String> {
         Err("Not a LetStatement".to_string())
     }
@@ -16,10 +12,6 @@ pub trait Statement: Node {
     fn into_expression(&self) -> Result<&ExpressionStatement, String> {
         Err("Not a ExpressionStatement".into())
     }
-}
-
-pub trait Expression: Node {
-    fn expression_node(&self) {}
     fn into_identifier(&self) -> Result<&Identifier, String> {
         Err("Not a Identifier".into())
     }
@@ -44,6 +36,18 @@ pub trait Expression: Node {
     fn into_call(&self) -> Result<&CallExpression, String> {
         Err("Not a CallExpression".into())
     }
+    fn into_program(&self) -> Result<&Program, String> {
+        Err("Not a Program".into())
+    }
+    fn into_node(&self) -> Box<&dyn Node>;
+}
+
+pub trait Statement: Node {
+    fn statement_node(&self) {}
+}
+
+pub trait Expression: Node {
+    fn expression_node(&self) {}
 }
 
 pub struct Program {
@@ -68,6 +72,13 @@ impl Node for Program {
 
         buffer
     }
+
+    fn into_program(&self) -> Result<&Program, String> {
+        Ok(self)
+    }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
 }
 
 pub struct LetStatement {
@@ -91,13 +102,15 @@ impl Node for LetStatement {
 
         buffer + ";"
     }
-}
-
-impl Statement for LetStatement {
     fn into_let(&self) -> Result<&LetStatement, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
 }
+
+impl Statement for LetStatement {}
 
 pub struct Identifier {
     pub token: Token,
@@ -112,12 +125,15 @@ impl Node for Identifier {
     fn to_string(&self) -> String {
         self.value.clone()
     }
-}
-
-impl Expression for Identifier {
     fn into_identifier(&self) -> Result<&Identifier, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for Identifier {
 }
 
 pub struct ReturnStatement {
@@ -141,12 +157,15 @@ impl Node for ReturnStatement {
 
         buffer + ";"
     }
-}
-
-impl Statement for ReturnStatement {
     fn into_return(&self) -> Result<&ReturnStatement, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Statement for ReturnStatement {
 }
 
 pub struct ExpressionStatement {
@@ -165,12 +184,15 @@ impl Node for ExpressionStatement {
         }
         return String::from("");
     }
-}
-
-impl Statement for ExpressionStatement {
     fn into_expression(&self) -> Result<&ExpressionStatement, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Statement for ExpressionStatement {
 }
 
 pub struct IntegerLiteral {
@@ -185,12 +207,15 @@ impl Node for IntegerLiteral {
     fn to_string(&self) -> String {
         self.token.literal.clone()
     }
-}
-
-impl Expression for IntegerLiteral {
     fn into_integer_literal(&self) -> Result<&IntegerLiteral, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for IntegerLiteral {
 }
 
 pub struct PrefixExpression {
@@ -214,12 +239,15 @@ impl Node for PrefixExpression {
 
         buffer
     }
-}
-
-impl Expression for PrefixExpression {
     fn into_prefix(&self) -> Result<&PrefixExpression, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for PrefixExpression {
 }
 
 pub struct InfixExpression {
@@ -249,12 +277,15 @@ impl Node for InfixExpression {
         buffer.push_str(")");
         buffer
     }
-}
-
-impl Expression for InfixExpression {
     fn into_infix(&self) -> Result<&InfixExpression, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for InfixExpression {
 }
 
 pub struct Boolean {
@@ -270,12 +301,15 @@ impl Node for Boolean {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
     }
-}
-
-impl Expression for Boolean {
     fn into_bool(&self) -> Result<&Boolean, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for Boolean {
 }
 
 pub struct IfExpression {
@@ -309,12 +343,15 @@ impl Node for IfExpression {
 
         buf
     }
-}
-
-impl Expression for IfExpression {
     fn into_if(&self) -> Result<&IfExpression, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for IfExpression {
 }
 
 pub struct BlockStatement {
@@ -332,6 +369,9 @@ impl Node for BlockStatement {
         self.statements.iter().for_each(|stmt| buf.push_str(&stmt.to_string()));
 
         buf
+    }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
     }
 }
 
@@ -362,12 +402,15 @@ impl Node for FunctionLiteral {
 
         buf
     }
-}
-
-impl Expression for FunctionLiteral {
     fn into_func(&self) -> Result<&FunctionLiteral, String>{
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for FunctionLiteral {
 }
 
 pub struct CallExpression {
@@ -393,10 +436,13 @@ impl Node for CallExpression {
 
         buf
     }
-}
-
-impl Expression for CallExpression {
     fn into_call(&self) -> Result<&CallExpression, String> {
         Ok(self)
     }
+    fn into_node(&self) -> Box<&dyn Node> {
+        Box::new(self)
+    }
+}
+
+impl Expression for CallExpression {
 }

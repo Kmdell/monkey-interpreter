@@ -3,7 +3,12 @@ mod lexer;
 pub mod repl;
 mod ast;
 mod parser;
+mod object;
+mod evaluator;
+#[cfg(test)]
 mod parser_test;
+#[cfg(test)]
+mod evaluator_test;
 
 
 #[cfg(test)]
