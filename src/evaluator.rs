@@ -21,8 +21,8 @@ pub fn eval(node: Box<&dyn Node>) -> Option<Box<dyn Object>> {
         let right = eval(prefix.right.as_ref().expect("There is no right").into_node());
         return Some(eval_prefix_expression(&prefix.operator, right.expect("There is no node")));
     } else if let Ok(infix) = node.into_infix() {
-        let left = eval(infix.into_node()).expect("There is no left evaluation");
-        let right = eval(infix.into_node()).expect("There is not right evaluation");
+        let left = eval(infix.left.as_ref().expect("There is no left to the infix").into_node()).expect("There is no left evaluation");
+        let right = eval(infix.right.as_ref().expect("There is no right to the infix").into_node()).expect("There is not right evaluation");
         return Some(eval_infix_expression(&infix.operator, left, right));
     } else if let Ok(prog) = node.into_program() {
         return eval_statements(&prog.statements);
@@ -87,7 +87,7 @@ fn eval_integer_infix_expression(operator: &String, left: Box<dyn Object>, right
     match &operator[..] {
         "+" => Box::new(Integer{ value: left_value + right_value }),
         "-" => Box::new(Integer { value: left_value - right_value }),
-        "*" => Box::new(Integer { value: left_value / right_value }),
+        "*" => Box::new(Integer { value: left_value * right_value }),
         "/" => Box::new(Integer { value: left_value / right_value }),
         _ => Box::new(NULL)
     }
