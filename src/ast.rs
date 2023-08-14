@@ -1,4 +1,5 @@
 use super::token::*;
+use std::rc::Rc;
 
 pub trait Node {
     fn token_literal(&self) -> String;
@@ -11,6 +12,9 @@ pub trait Node {
     }
     fn into_expression(&self) -> Result<&ExpressionStatement, String> {
         Err("Not a ExpressionStatement".into())
+    }
+    fn into_block(&self) -> Result<&BlockStatement, String> {
+        Err("Not a BlockStatement".into())
     }
     fn into_identifier(&self) -> Result<&Identifier, String> {
         Err("Not a Identifier".into())
@@ -39,7 +43,7 @@ pub trait Node {
     fn into_program(&self) -> Result<&Program, String> {
         Err("Not a Program".into())
     }
-    fn into_node(&self) -> Box<&dyn Node>;
+    fn into_node(&self) -> Rc<&dyn Node>;
 }
 
 pub trait Statement: Node {
@@ -76,8 +80,8 @@ impl Node for Program {
     fn into_program(&self) -> Result<&Program, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -105,8 +109,8 @@ impl Node for LetStatement {
     fn into_let(&self) -> Result<&LetStatement, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -128,8 +132,8 @@ impl Node for Identifier {
     fn into_identifier(&self) -> Result<&Identifier, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -160,8 +164,8 @@ impl Node for ReturnStatement {
     fn into_return(&self) -> Result<&ReturnStatement, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -187,8 +191,8 @@ impl Node for ExpressionStatement {
     fn into_expression(&self) -> Result<&ExpressionStatement, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -210,8 +214,8 @@ impl Node for IntegerLiteral {
     fn into_integer_literal(&self) -> Result<&IntegerLiteral, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -242,8 +246,8 @@ impl Node for PrefixExpression {
     fn into_prefix(&self) -> Result<&PrefixExpression, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -280,8 +284,8 @@ impl Node for InfixExpression {
     fn into_infix(&self) -> Result<&InfixExpression, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -304,8 +308,8 @@ impl Node for Boolean {
     fn into_bool(&self) -> Result<&Boolean, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -346,8 +350,8 @@ impl Node for IfExpression {
     fn into_if(&self) -> Result<&IfExpression, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -370,8 +374,11 @@ impl Node for BlockStatement {
 
         buf
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_block(&self) -> Result<&BlockStatement, String> {
+        Ok(self)
+    }
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -405,8 +412,8 @@ impl Node for FunctionLiteral {
     fn into_func(&self) -> Result<&FunctionLiteral, String>{
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 
@@ -439,8 +446,8 @@ impl Node for CallExpression {
     fn into_call(&self) -> Result<&CallExpression, String> {
         Ok(self)
     }
-    fn into_node(&self) -> Box<&dyn Node> {
-        Box::new(self)
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
     }
 }
 

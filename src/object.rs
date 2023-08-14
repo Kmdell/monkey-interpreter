@@ -1,8 +1,12 @@
+use std::rc::Rc;
+
 pub type ObjectType = String;
 
 pub const INTEGER_OBJ: &str = "INTEGER";
 pub const BOOLEAN_OBJ: &str = "BOOLEAN";
 pub const NULL_OBJ: &str = "NULL";
+pub const RETURN_VALUE_OBJ: &str = "RETURN";
+pub const ERROR_OBJ: &str = "ERROR";
 
 pub trait Object {
     fn object_type(&self) -> ObjectType;
@@ -15,6 +19,12 @@ pub trait Object {
     }
     fn into_null(&self) -> Result<&Null, String> {
         Err("Not a Null".into())
+    }
+    fn into_return(&self) -> Result<&ReturnValue, String> {
+        Err("Not a ReturnValue".into())
+    }
+    fn into_error(&self) -> Result<&Error, String> {
+        Err("Not a Error".into())
     }
 }
 
@@ -60,6 +70,38 @@ impl Object for Null {
         "null".into()
     }
     fn into_null(&self) -> Result<&Null, String> {
+        Ok(self)
+    }
+}
+
+pub struct ReturnValue {
+    pub value: Rc<dyn Object>
+}
+
+impl Object for ReturnValue {
+    fn object_type(&self) -> ObjectType {
+        RETURN_VALUE_OBJ.into()
+    }
+    fn inspect(&self) -> String {
+        self.value.inspect()
+    }
+    fn into_return(&self) -> Result<&ReturnValue, String> {
+        Ok(self)
+    }
+}
+
+pub struct Error {
+    pub message: String
+}
+
+impl Object for Error {
+    fn object_type(&self) -> ObjectType {
+        ERROR_OBJ.into()
+    }
+    fn inspect(&self) -> String {
+        self.message.clone()
+    }
+    fn into_error(&self) -> Result<&Error, String> {
         Ok(self)
     }
 }

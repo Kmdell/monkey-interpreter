@@ -2,7 +2,7 @@ use crate::{
     lexer::*,
     parser::*,
     ast::*,
-    evaluator::*
+    evaluator::*, environment::Environment
 };
 use std::io::{self, Write};
 
@@ -20,6 +20,7 @@ const MONKEY_FACE: &str = r#"            __,__
            '-----'"#;
 
 pub fn start() {
+    let mut env = Environment::new();
     loop {
         print!("{} ", PROMPT);
         io::stdout().flush().unwrap();
@@ -35,7 +36,7 @@ pub fn start() {
             continue;
         }
         
-        if let Some(evaluated) = eval(program.into_node()) {
+        if let Some(evaluated) = eval(program.into_node().into(), &mut env) {
             println!("{}", evaluated.inspect());
         }
     }
