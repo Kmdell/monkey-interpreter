@@ -8,6 +8,9 @@ use crate::{
 };
 use std::rc::Rc;
 
+#[cfg(test)]
+mod evaluator_test;
+
 const NULL: object::Null = object::Null{};
 const TRUE: object::Boolean = object::Boolean{ value: true };
 const FALSE: object::Boolean = object::Boolean{ value: false };
@@ -54,7 +57,6 @@ pub fn eval(node: Rc<&dyn Node>, env: &mut Environment) -> Option<Rc<dyn Object>
         }
         return Some(eval_infix_expression(&infix.operator, left.expect("left did not evaluate proper"), right.expect("right did not evaluate proper")));
     } else if let Ok(prog) = node.into_program() {
-        println!("{} : {}", node.to_string(), prog.statements.len());
         return eval_program(&prog.statements, env);
     }
 

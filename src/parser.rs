@@ -10,6 +10,9 @@ use std::{
 };
 use Precedence::*;
 
+#[cfg(test)]
+mod parser_test;
+
 #[derive(Clone)]
 enum Precedence {
     LOWEST = 1,

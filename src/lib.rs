@@ -6,10 +6,6 @@ mod parser;
 mod object;
 mod evaluator;
 mod environment;
-#[cfg(test)]
-mod parser_test;
-#[cfg(test)]
-mod evaluator_test;
 
 
 #[cfg(test)]
