@@ -1,17 +1,16 @@
-mod token;
-mod lexer;
-pub mod repl;
 mod ast;
-mod parser;
-mod object;
-mod evaluator;
 mod environment;
-
+mod evaluator;
+mod lexer;
+mod object;
+mod parser;
+pub mod repl;
+mod token;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_next_token() {
         struct Test {
@@ -123,17 +122,30 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;
-".to_string();
+"
+        .to_string();
 
         let mut l = lexer::Lexer::new(input);
 
         for (i, tt) in tests.iter().enumerate() {
             let tok = l.next_token();
-            
-            assert!(tok.token_type.eq(&tt.expected_type), "tests[{}] - token_type wrong, expected=\"{}\", got=\"{}\"", i, tt.expected_type, tok.token_type);
+
+            assert!(
+                tok.token_type.eq(&tt.expected_type),
+                "tests[{}] - token_type wrong, expected=\"{}\", got=\"{}\"",
+                i,
+                tt.expected_type,
+                tok.token_type
+            );
 
             println!("{} | {}", tok.literal, tt.expected_literal);
-            assert!(tok.literal.eq(&tt.expected_literal), "tests[{}] - literal wrong, expectec=\"{}\", got=\"{}\"", i, tt.expected_literal, tok.literal);
+            assert!(
+                tok.literal.eq(&tt.expected_literal),
+                "tests[{}] - literal wrong, expectec=\"{}\", got=\"{}\"",
+                i,
+                tt.expected_literal,
+                tok.literal
+            );
         }
     }
 }

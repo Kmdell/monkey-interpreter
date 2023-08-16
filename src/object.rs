@@ -1,7 +1,10 @@
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::{ast::{Identifier, BlockStatement, Node}, environment::Environment};
+use crate::{
+    ast::{BlockStatement, Identifier, Node},
+    environment::Environment,
+};
 
 pub type ObjectType = String;
 
@@ -36,7 +39,7 @@ pub trait Object {
 }
 
 pub struct Integer {
-    pub value: i64
+    pub value: i64,
 }
 
 impl Object for Integer {
@@ -52,7 +55,7 @@ impl Object for Integer {
 }
 
 pub struct Boolean {
-    pub value: bool
+    pub value: bool,
 }
 
 impl Object for Boolean {
@@ -82,7 +85,7 @@ impl Object for Null {
 }
 
 pub struct ReturnValue {
-    pub value: Rc<dyn Object>
+    pub value: Rc<dyn Object>,
 }
 
 impl Object for ReturnValue {
@@ -98,7 +101,7 @@ impl Object for ReturnValue {
 }
 
 pub struct Error {
-    pub message: String
+    pub message: String,
 }
 
 impl Object for Error {
@@ -116,7 +119,7 @@ impl Object for Error {
 pub struct Function {
     pub parameters: Vec<Identifier>,
     pub body: Rc<BlockStatement>,
-    pub env: Rc<RefCell<Environment>>
+    pub env: Rc<RefCell<Environment>>,
 }
 
 impl Object for Function {
@@ -127,7 +130,9 @@ impl Object for Function {
         let mut buf = String::new();
 
         let mut params = vec![];
-        self.parameters.iter().for_each(|p| params.push(p.to_string()));
+        self.parameters
+            .iter()
+            .for_each(|p| params.push(p.to_string()));
 
         buf.push_str("fn(");
         buf.push_str(&params.join(", "));

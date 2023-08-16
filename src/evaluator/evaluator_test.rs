@@ -1,8 +1,5 @@
 use crate::{
-    lexer::Lexer,
-    parser::Parser,
-    object::*, 
-    evaluator::*, ast::Node, environment::Environment
+    ast::Node, environment::Environment, evaluator::*, lexer::Lexer, object::*, parser::Parser,
 };
 use std::rc::Rc;
 
@@ -12,14 +9,21 @@ fn test_eval(input: String) -> Rc<dyn Object> {
     let prog = p.parse_program();
     let env = Environment::new();
 
-    return eval(prog.expect("There is no program parsed").into_node(), Rc::new(RefCell::new(env))).unwrap();
+    return eval(
+        prog.expect("There is no program parsed").into_node(),
+        Rc::new(RefCell::new(env)),
+    )
+    .unwrap();
 }
 
 fn test_integer_object(obj: Rc<dyn Object>, expected: i64) {
     let result = obj.into_int().unwrap_or_else(|e| panic!("{}", e));
 
     if result.value != expected {
-        panic!("object has wrong value, got={}, expected={}", result.value, expected);
+        panic!(
+            "object has wrong value, got={}, expected={}",
+            result.value, expected
+        );
     }
 }
 
@@ -27,7 +31,10 @@ fn test_boolean_object(obj: Rc<dyn Object>, expected: bool) {
     let result = obj.into_bool().unwrap_or_else(|e| panic!("{}", e));
 
     if result.value != expected {
-        panic!("object had wrong value, got={}, expected={}", result.value, expected);
+        panic!(
+            "object had wrong value, got={}, expected={}",
+            result.value, expected
+        );
     }
 }
 
@@ -39,69 +46,69 @@ fn test_null_object(obj: Rc<dyn Object>) {
 fn test_eval_integer_expression() {
     struct Test {
         input: String,
-        expected: i64
+        expected: i64,
     }
 
     let tests = vec![
         Test {
             input: "5".into(),
-            expected: 5
+            expected: 5,
         },
         Test {
             input: "10".into(),
-            expected: 10
+            expected: 10,
         },
         Test {
             input: "-5".into(),
-            expected: -5
+            expected: -5,
         },
         Test {
             input: "-10".into(),
-            expected: -10
+            expected: -10,
         },
         Test {
             input: "5 + 5 + 5 + 5 - 10".into(),
-            expected: 10
+            expected: 10,
         },
         Test {
             input: "2 * 2 * 2 * 2 * 2".into(),
-            expected: 32
+            expected: 32,
         },
         Test {
             input: "-50 + 100 + -50".into(),
-            expected: 0
+            expected: 0,
         },
         Test {
             input: "5 * 2 + 10".into(),
-            expected: 20
+            expected: 20,
         },
         Test {
             input: "5 + 2 * 10".into(),
-            expected: 25
+            expected: 25,
         },
         Test {
             input: "20 + 2 * -10".into(),
-            expected: 0
+            expected: 0,
         },
         Test {
             input: "50 / 2 * 2 + 10".into(),
-            expected: 60
+            expected: 60,
         },
         Test {
             input: "2 * (5 + 10)".into(),
-            expected: 30
+            expected: 30,
         },
         Test {
             input: "3 * 3 * 3 + 10".into(),
-            expected: 37
+            expected: 37,
         },
         Test {
             input: "3 * (3 * 3) + 10".into(),
-            expected: 37
+            expected: 37,
         },
         Test {
             input: "(5 + 10 * 2 + 15 / 3) * 2 + -10".into(),
-            expected: 50
+            expected: 50,
         },
     ];
 
@@ -115,85 +122,85 @@ fn test_eval_integer_expression() {
 fn test_eval_boolean_expression() {
     struct Test {
         input: String,
-        expected: bool
+        expected: bool,
     }
 
     let tests = vec![
         Test {
             input: "true".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "false".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "1 < 2".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "1 > 2".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "1 < 1".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "1 > 1".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "1 == 1".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "1 != 1".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "1 != 1".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "1 != 2".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "true == true".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "false == false".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "true == false".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "true != false".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "false != true".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "(1 < 2) == true".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "(1 < 2) == false".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "(1 > 2) == true".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "(1 > 2) == false".into(),
-            expected: true
+            expected: true,
         },
     ];
 
@@ -207,34 +214,34 @@ fn test_eval_boolean_expression() {
 fn test_bang_operator() {
     struct Test {
         input: String,
-        expected: bool
+        expected: bool,
     }
 
     let tests = vec![
         Test {
             input: "!true".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "!false".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "!5".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "!!true".into(),
-            expected: true
+            expected: true,
         },
         Test {
             input: "!!false".into(),
-            expected: false
+            expected: false,
         },
         Test {
             input: "!!5".into(),
-            expected: true
-        }
+            expected: true,
+        },
     ];
 
     for tt in tests {
@@ -247,38 +254,38 @@ fn test_bang_operator() {
 fn test_if_else_expression() {
     struct Test {
         input: String,
-        expected: String
+        expected: String,
     }
 
     let tests = vec![
         Test {
             input: "if (true) { 10 }".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "if (false) { 10 }".into(),
-            expected: "null".into()
+            expected: "null".into(),
         },
         Test {
             input: "if (1) { 10 }".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "if (1 < 2) { 10 }".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "if (1 > 2) { 10 }".into(),
-            expected: "null".into()
+            expected: "null".into(),
         },
         Test {
             input: "if (1 > 2) { 10 } else { 20 }".into(),
-            expected: "20".into()
+            expected: "20".into(),
         },
         Test {
             input: "if (1 < 2) { 10 } else { 20 }".into(),
-            expected: "10".into()
-        }
+            expected: "10".into(),
+        },
     ];
 
     for tt in tests {
@@ -295,25 +302,25 @@ fn test_if_else_expression() {
 fn test_return_statment() {
     struct Test {
         input: String,
-        expected: String
+        expected: String,
     }
 
     let tests = vec![
         Test {
             input: "return 10;".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "return 10; 9;".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "return 2 * 5; 9;".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "9; return 2 * 5; 9;".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "
@@ -323,9 +330,10 @@ if (10 > 1) {
     }
 
     return 1;
-}".into(),
-            expected: "10".into()
-        }
+}"
+            .into(),
+            expected: "10".into(),
+        },
     ];
 
     for tt in tests {
@@ -342,33 +350,33 @@ if (10 > 1) {
 fn test_error_handling() {
     struct Test {
         input: String,
-        expected_message: String
+        expected_message: String,
     }
 
     let tests = vec![
         Test {
             input: "5 + true;".into(),
-            expected_message: "type mismatch: INTEGER + BOOLEAN".into()
+            expected_message: "type mismatch: INTEGER + BOOLEAN".into(),
         },
         Test {
             input: "5 + true; 5;".into(),
-            expected_message: "type mismatch: INTEGER + BOOLEAN".into()
+            expected_message: "type mismatch: INTEGER + BOOLEAN".into(),
         },
         Test {
             input: "-true".into(),
-            expected_message: "unknown operator: -BOOLEAN".into()
+            expected_message: "unknown operator: -BOOLEAN".into(),
         },
         Test {
             input: "true + false".into(),
-            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into()
+            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into(),
         },
         Test {
             input: "5; true + false; 5;".into(),
-            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into()
+            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into(),
         },
         Test {
             input: "if (10 > 1) { true + false; }".into(),
-            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into()
+            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into(),
         },
         Test {
             input: "
@@ -378,13 +386,14 @@ if (10 > 1) {
     }
 
     return 1;
-}".into(),
-            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into()
+}"
+            .into(),
+            expected_message: "unknown operator: BOOLEAN + BOOLEAN".into(),
         },
         Test {
             input: "foobar".into(),
-            expected_message: "identifier not found: foobar".into()
-        }
+            expected_message: "identifier not found: foobar".into(),
+        },
     ];
 
     for tt in tests {
@@ -393,7 +402,10 @@ if (10 > 1) {
         let error = evaluated.into_error().unwrap_or_else(|e| panic!("{}", e));
 
         if error.message != tt.expected_message {
-            panic!("wrong error message. expected='{}', got='{}'", tt.expected_message, error.message);
+            panic!(
+                "wrong error message. expected='{}', got='{}'",
+                tt.expected_message, error.message
+            );
         }
     }
 }
@@ -402,26 +414,26 @@ if (10 > 1) {
 fn test_let_statements() {
     struct Test {
         input: String,
-        expected: String
+        expected: String,
     }
 
     let tests = vec![
         Test {
             input: "let a = 5; a;".into(),
-            expected: "5".into()
+            expected: "5".into(),
         },
         Test {
             input: "let a = 5 * 5; a;".into(),
-            expected: "25".into()
+            expected: "25".into(),
         },
         Test {
             input: "let a = 5; let b = a; b;".into(),
-            expected: "5".into()
+            expected: "5".into(),
         },
         Test {
             input: "let a = 5; let b = a; let c = a + b + 5; c;".into(),
-            expected: "15".into()
-        }
+            expected: "15".into(),
+        },
     ];
 
     for tt in tests {
@@ -442,17 +454,27 @@ fn test_function_object() {
     let func = evaluated.into_fn().unwrap_or_else(|e| panic!("{}", e));
 
     if func.parameters.len() != 1 {
-        panic!("function has wrong parameters. Parameters={}", func.parameters.len());
+        panic!(
+            "function has wrong parameters. Parameters={}",
+            func.parameters.len()
+        );
     }
 
     if func.parameters[0].to_string() != "x" {
-        panic!("parameter is not 'x'. got={}", func.parameters[0].to_string());
+        panic!(
+            "parameter is not 'x'. got={}",
+            func.parameters[0].to_string()
+        );
     }
 
     let expected_body = "(x + 2)".to_string();
 
     if func.body.to_string() != expected_body {
-        panic!("body is not {}. got={}", expected_body, func.body.to_string());
+        panic!(
+            "body is not {}. got={}",
+            expected_body,
+            func.body.to_string()
+        );
     }
 }
 
@@ -460,33 +482,33 @@ fn test_function_object() {
 fn test_function_application() {
     struct Test {
         input: String,
-        expected: String
-    }   
+        expected: String,
+    }
 
     let tests = vec![
         Test {
             input: "let identity = fn(x) { x; }; identity(5);".into(),
-            expected: "5".into()
+            expected: "5".into(),
         },
         Test {
             input: "let identity = fn(x) { return x; }; identity(5);".into(),
-            expected: "5".into()
+            expected: "5".into(),
         },
         Test {
             input: "let double = fn(x) { x * 2; }; double(5);".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "let add = fn(x, y) { x + y; }; add(5, 5);".into(),
-            expected: "10".into()
+            expected: "10".into(),
         },
         Test {
             input: "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));".into(),
-            expected: "20".into()
+            expected: "20".into(),
         },
         Test {
             input: "fn(x) { return x; }(5)".into(),
-            expected: "5".into()
+            expected: "5".into(),
         },
     ];
 
@@ -510,7 +532,8 @@ let new_adder = fn(x) { fn(y) { x + y } };
 
 let add_two = new_adder(2);
 add_two(2);
-".into();
+"
+    .into();
 
     test_integer_object(test_eval(input), 4);
-}   
+}

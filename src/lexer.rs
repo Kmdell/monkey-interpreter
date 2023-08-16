@@ -3,9 +3,9 @@ use super::*;
 #[derive(Debug, Clone)]
 pub struct Lexer {
     pub input: Vec<char>,
-    pub pos: usize, // current position in input (points to current char)
+    pub pos: usize,      // current position in input (points to current char)
     pub read_pos: usize, // current reading position in input (after current char)
-    pub ch: char, // current char under examination
+    pub ch: char,        // current char under examination
 }
 
 impl Lexer {
@@ -41,7 +41,7 @@ impl Lexer {
 
     pub fn next_token(&mut self) -> token::Token {
         let tok: token::Token;
-        
+
         self.skip_whitespace();
 
         match self.ch {
@@ -52,9 +52,9 @@ impl Lexer {
                     let literal = [ch, self.ch].iter().collect();
                     tok = token::Token::new(token::EQ.to_string(), literal);
                 } else {
-                    tok = token::Token::new(token::ASSIGN.to_string(), self.ch.to_string()); 
+                    tok = token::Token::new(token::ASSIGN.to_string(), self.ch.to_string());
                 }
-            },
+            }
             '!' => {
                 if self.peek_char() == '=' {
                     let ch = self.ch;
@@ -62,32 +62,56 @@ impl Lexer {
                     let literal = [ch, self.ch].iter().collect();
                     tok = token::Token::new(token::NOT_EQ.to_string(), literal);
                 } else {
-                    tok = token::Token::new(token::BANG.to_string(), self.ch.to_string()); 
+                    tok = token::Token::new(token::BANG.to_string(), self.ch.to_string());
                 }
-            },
-            ';' => { tok = token::Token::new(token::SEMICOLON.to_string(), self.ch.to_string()); },
-            '+' => { tok = token::Token::new(token::PLUS.to_string(), self.ch.to_string()); },
-            '-' => { tok = token::Token::new(token::MINUS.to_string(), self.ch.to_string()) },
-            '/' => { tok = token::Token::new(token::SLASH.to_string(), self.ch.to_string()); },
-            '*' => { tok = token::Token::new(token::ASTERICK.to_string(), self.ch.to_string()); },
-            '<' => { tok = token::Token::new(token::LT.to_string(), self.ch.to_string()); },
-            '>' => { tok = token::Token::new(token::GT.to_string(), self.ch.to_string()); },
-            '(' => { tok = token::Token::new(token::LPAREN.to_string(), self.ch.to_string()); },
-            ')' => { tok = token::Token::new(token::RPAREN.to_string(), self.ch.to_string()); },
-            ',' => { tok = token::Token::new(token::COMMA.to_string(), self.ch.to_string()); },
-            '{' => { tok = token::Token::new(token::LBRACE.to_string(), self.ch.to_string()); },
-            '}' => { tok = token::Token::new(token::RBRACE.to_string(), self.ch.to_string()); },
-            '\0' => { tok = token::Token::new(token::EOF.to_string(), "".to_string()); },
+            }
+            ';' => {
+                tok = token::Token::new(token::SEMICOLON.to_string(), self.ch.to_string());
+            }
+            '+' => {
+                tok = token::Token::new(token::PLUS.to_string(), self.ch.to_string());
+            }
+            '-' => tok = token::Token::new(token::MINUS.to_string(), self.ch.to_string()),
+            '/' => {
+                tok = token::Token::new(token::SLASH.to_string(), self.ch.to_string());
+            }
+            '*' => {
+                tok = token::Token::new(token::ASTERICK.to_string(), self.ch.to_string());
+            }
+            '<' => {
+                tok = token::Token::new(token::LT.to_string(), self.ch.to_string());
+            }
+            '>' => {
+                tok = token::Token::new(token::GT.to_string(), self.ch.to_string());
+            }
+            '(' => {
+                tok = token::Token::new(token::LPAREN.to_string(), self.ch.to_string());
+            }
+            ')' => {
+                tok = token::Token::new(token::RPAREN.to_string(), self.ch.to_string());
+            }
+            ',' => {
+                tok = token::Token::new(token::COMMA.to_string(), self.ch.to_string());
+            }
+            '{' => {
+                tok = token::Token::new(token::LBRACE.to_string(), self.ch.to_string());
+            }
+            '}' => {
+                tok = token::Token::new(token::RBRACE.to_string(), self.ch.to_string());
+            }
+            '\0' => {
+                tok = token::Token::new(token::EOF.to_string(), "".to_string());
+            }
             _ => {
                 if self.is_letter() {
                     let literal = self.read_identifier();
                     return token::Token::new(token::lookup_ident(&literal), literal);
                 } else if self.is_digit() {
-                    return token::Token::new(token::INT.to_string(), self.read_number())
+                    return token::Token::new(token::INT.to_string(), self.read_number());
                 } else {
                     tok = token::Token::new(token::ILLEGAL.to_string(), self.ch.to_string());
                 }
-            },
+            }
         }
 
         self.read_char();
@@ -96,7 +120,7 @@ impl Lexer {
 
     fn read_identifier(&mut self) -> String {
         let pos = self.pos;
-        
+
         while self.is_letter() {
             self.read_char();
         }

@@ -1,22 +1,24 @@
 use crate::object::*;
-use std::{
-    rc::Rc,
-    cell::RefCell,
-    collections::HashMap
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 pub struct Environment {
     store: HashMap<String, Rc<dyn Object>>,
-    pub outer: Option<Rc<RefCell<Environment>>>
+    pub outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
-        Environment { store: HashMap::new() , outer: None }
+        Environment {
+            store: HashMap::new(),
+            outer: None,
+        }
     }
 
     pub fn new_enc(outer: Rc<RefCell<Environment>>) -> Self {
-        Environment { store: HashMap::new(), outer: Some(outer.clone()) }
+        Environment {
+            store: HashMap::new(),
+            outer: Some(outer.clone()),
+        }
     }
 
     pub fn get(&self, name: &String) -> Option<Rc<dyn Object>> {
@@ -35,5 +37,3 @@ impl Environment {
         self.store.insert(name, val)
     }
 }
-
-

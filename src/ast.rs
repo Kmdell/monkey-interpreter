@@ -69,7 +69,7 @@ impl Node for Program {
 
     fn to_string(&self) -> String {
         let mut buffer = String::new();
-        
+
         self.statements.iter().for_each(|stmt| {
             buffer.push_str(&stmt.to_string());
         });
@@ -138,12 +138,11 @@ impl Node for Identifier {
     }
 }
 
-impl Expression for Identifier {
-}
+impl Expression for Identifier {}
 
 pub struct ReturnStatement {
     pub token: Token,
-    pub return_value: Option<Box<dyn Expression>>
+    pub return_value: Option<Box<dyn Expression>>,
 }
 
 impl Node for ReturnStatement {
@@ -170,12 +169,11 @@ impl Node for ReturnStatement {
     }
 }
 
-impl Statement for ReturnStatement {
-}
+impl Statement for ReturnStatement {}
 
 pub struct ExpressionStatement {
     pub token: Token,
-    pub expression: Option<Box<dyn Expression>>
+    pub expression: Option<Box<dyn Expression>>,
 }
 
 impl Node for ExpressionStatement {
@@ -197,8 +195,7 @@ impl Node for ExpressionStatement {
     }
 }
 
-impl Statement for ExpressionStatement {
-}
+impl Statement for ExpressionStatement {}
 
 pub struct IntegerLiteral {
     pub token: Token,
@@ -220,8 +217,7 @@ impl Node for IntegerLiteral {
     }
 }
 
-impl Expression for IntegerLiteral {
-}
+impl Expression for IntegerLiteral {}
 
 pub struct PrefixExpression {
     pub token: Token,
@@ -252,8 +248,7 @@ impl Node for PrefixExpression {
     }
 }
 
-impl Expression for PrefixExpression {
-}
+impl Expression for PrefixExpression {}
 
 pub struct InfixExpression {
     pub token: Token,
@@ -290,12 +285,11 @@ impl Node for InfixExpression {
     }
 }
 
-impl Expression for InfixExpression {
-}
+impl Expression for InfixExpression {}
 
 pub struct Boolean {
     pub token: Token,
-    pub value: bool
+    pub value: bool,
 }
 
 impl Node for Boolean {
@@ -314,14 +308,13 @@ impl Node for Boolean {
     }
 }
 
-impl Expression for Boolean {
-}
+impl Expression for Boolean {}
 
 pub struct IfExpression {
     pub token: Token,
     pub condition: Option<Box<dyn Expression>>,
     pub consequence: Option<Box<BlockStatement>>,
-    pub alternative: Option<Box<BlockStatement>>
+    pub alternative: Option<Box<BlockStatement>>,
 }
 
 impl Node for IfExpression {
@@ -330,7 +323,7 @@ impl Node for IfExpression {
     }
     fn to_string(&self) -> String {
         let mut buf = String::from("if");
-        
+
         if let Some(cond) = &self.condition {
             buf.push_str(&cond.to_string());
         }
@@ -356,12 +349,11 @@ impl Node for IfExpression {
     }
 }
 
-impl Expression for IfExpression {
-}
+impl Expression for IfExpression {}
 
 pub struct BlockStatement {
     pub token: Token,
-    pub statements: Vec<Box<dyn Statement>>
+    pub statements: Vec<Box<dyn Statement>>,
 }
 
 impl Node for BlockStatement {
@@ -371,7 +363,9 @@ impl Node for BlockStatement {
     fn to_string(&self) -> String {
         let mut buf = String::new();
 
-        self.statements.iter().for_each(|stmt| buf.push_str(&stmt.to_string()));
+        self.statements
+            .iter()
+            .for_each(|stmt| buf.push_str(&stmt.to_string()));
 
         buf
     }
@@ -388,7 +382,7 @@ impl Statement for BlockStatement {}
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<Box<dyn Expression>>,
-    pub body: Option<Rc<BlockStatement>>
+    pub body: Option<Rc<BlockStatement>>,
 }
 
 impl Node for FunctionLiteral {
@@ -397,20 +391,26 @@ impl Node for FunctionLiteral {
     }
     fn to_string(&self) -> String {
         let mut buf = self.token_literal();
-        
+
         let para: Vec<String> = self.parameters.iter().map(|p| p.to_string()).collect();
 
         buf.push_str("(");
-    
+
         buf.push_str(&(para.join(", ")));
 
         buf.push_str(")");
 
-        buf.push_str(&self.body.as_ref().expect("There is not body for this function").to_string());
+        buf.push_str(
+            &self
+                .body
+                .as_ref()
+                .expect("There is not body for this function")
+                .to_string(),
+        );
 
         buf
     }
-    fn into_func(&self) -> Result<&FunctionLiteral, String>{
+    fn into_func(&self) -> Result<&FunctionLiteral, String> {
         Ok(self)
     }
     fn into_node(&self) -> Rc<&dyn Node> {
@@ -418,13 +418,12 @@ impl Node for FunctionLiteral {
     }
 }
 
-impl Expression for FunctionLiteral {
-}
+impl Expression for FunctionLiteral {}
 
 pub struct CallExpression {
     pub token: Token,
     pub function: Option<Box<dyn Expression>>,
-    pub arguments: Vec<Box<dyn Expression>>
+    pub arguments: Vec<Box<dyn Expression>>,
 }
 
 impl Node for CallExpression {
@@ -435,9 +434,17 @@ impl Node for CallExpression {
         let mut buf = String::new();
 
         let mut args = vec![];
-        self.arguments.iter().for_each(|arg| args.push(arg.to_string()));
+        self.arguments
+            .iter()
+            .for_each(|arg| args.push(arg.to_string()));
 
-        buf.push_str(&self.function.as_ref().expect("There is no function").to_string());
+        buf.push_str(
+            &self
+                .function
+                .as_ref()
+                .expect("There is no function")
+                .to_string(),
+        );
         buf.push_str("(");
         buf.push_str(&args.join(", "));
         buf.push_str(")");
@@ -452,5 +459,4 @@ impl Node for CallExpression {
     }
 }
 
-impl Expression for CallExpression {
-}
+impl Expression for CallExpression {}

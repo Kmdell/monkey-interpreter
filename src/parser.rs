@@ -1,13 +1,5 @@
-use super::{
-    lexer::*, 
-    token::*, 
-    ast::*,
-};
-use std::{
-    mem, 
-    rc::Rc,
-    collections::HashMap,
-};
+use super::{ast::*, lexer::*, token::*};
+use std::{collections::HashMap, mem, rc::Rc};
 use Precedence::*;
 
 #[cfg(test)]
@@ -16,17 +8,17 @@ mod parser_test;
 #[derive(Clone)]
 enum Precedence {
     LOWEST = 1,
-    EQUALS = 2, // ==
+    EQUALS = 2,      // ==
     LESSGREATER = 3, // < or >
-    SUM = 4, // +
-    PRODUCT = 5, // *
-    PREFIX = 6, // -X or !X
-    CALL = 7, //myFunction(X)
+    SUM = 4,         // +
+    PRODUCT = 5,     // *
+    PREFIX = 6,      // -X or !X
+    CALL = 7,        //myFunction(X)
 }
 
 type PrefixParseFn = Rc<dyn Fn(&mut Parser) -> Option<Box<dyn Expression>>>;
-type InfixParseFn = Rc<dyn Fn(&mut Parser, Option<Box<dyn Expression>>) -> Option<Box<dyn Expression>>>;
-
+type InfixParseFn =
+    Rc<dyn Fn(&mut Parser, Option<Box<dyn Expression>>) -> Option<Box<dyn Expression>>>;
 
 pub struct Parser {
     l: Lexer,
@@ -67,17 +59,26 @@ impl Parser {
         p.register_prefix(INT.to_string(), Rc::new(Parser::parse_integer_literal));
         p.register_prefix(TRUE.to_string(), Rc::new(Parser::parse_boolean));
         p.register_prefix(FALSE.to_string(), Rc::new(Parser::parse_boolean));
-        p.register_prefix(LPAREN.to_string(), Rc::new(Parser::parse_grouped_expression));
+        p.register_prefix(
+            LPAREN.to_string(),
+            Rc::new(Parser::parse_grouped_expression),
+        );
         p.register_prefix(IF.to_string(), Rc::new(Parser::parse_if_expression));
-        p.register_prefix(FUNCTION.to_string(), Rc::new(Parser::parse_function_literal));
+        p.register_prefix(
+            FUNCTION.to_string(),
+            Rc::new(Parser::parse_function_literal),
+        );
         p.register_prefix(BANG.to_string(), Rc::new(Parser::parse_prefix_expression));
         p.register_prefix(MINUS.to_string(), Rc::new(Parser::parse_prefix_expression));
-        
+
         p.register_infix(LPAREN.to_string(), Rc::new(Parser::parse_call_expression));
         p.register_infix(PLUS.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(MINUS.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(SLASH.to_string(), Rc::new(Parser::parse_infix_expression));
-        p.register_infix(ASTERICK.to_string(), Rc::new(Parser::parse_infix_expression));
+        p.register_infix(
+            ASTERICK.to_string(),
+            Rc::new(Parser::parse_infix_expression),
+        );
         p.register_infix(EQ.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(NOT_EQ.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(LT.to_string(), Rc::new(Parser::parse_infix_expression));
@@ -92,9 +93,7 @@ impl Parser {
     }
 
     pub fn parse_program(&mut self) -> Option<Program> {
-        let mut program = Program {
-            statements: vec![],   
-        };
+        let mut program = Program { statements: vec![] };
         while !self.cur_token_is(EOF.to_string()) {
             if let Some(stmt) = self.parse_statement() {
                 program.statements.push(stmt);
@@ -176,7 +175,7 @@ impl Parser {
     fn parse_block_statement(&mut self) -> Option<Box<BlockStatement>> {
         let mut block = BlockStatement {
             token: self.cur_token.clone(),
-            statements: vec![]
+            statements: vec![],
         };
 
         self.next_token();
@@ -193,7 +192,7 @@ impl Parser {
 
     fn parse_function_parameters(&mut self) -> Vec<Box<dyn Expression>> {
         let mut idents = vec![];
-        
+
         if self.peek_token_is(RPAREN.to_string()) {
             self.next_token();
             return idents;
@@ -203,7 +202,7 @@ impl Parser {
 
         let ident = Identifier {
             token: self.cur_token.clone(),
-            value: self.cur_token.literal.clone()
+            value: self.cur_token.literal.clone(),
         };
         idents.push(Box::new(ident));
 
@@ -212,7 +211,7 @@ impl Parser {
             self.next_token();
             let ident = Identifier {
                 token: self.cur_token.clone(),
-                value: self.cur_token.literal.clone()
+                value: self.cur_token.literal.clone(),
             };
             idents.push(Box::new(ident));
         }
@@ -233,12 +232,18 @@ impl Parser {
         }
 
         self.next_token();
-        args.push(self.parse_expression(LOWEST as u8).expect("Nothing was parsed"));
+        args.push(
+            self.parse_expression(LOWEST as u8)
+                .expect("Nothing was parsed"),
+        );
 
         while self.peek_token_is(COMMA.to_string()) {
             self.next_token();
             self.next_token();
-            args.push(self.parse_expression(LOWEST as u8).expect("Nothing was parsed"));
+            args.push(
+                self.parse_expression(LOWEST as u8)
+                    .expect("Nothing was parsed"),
+            );
         }
 
         if !self.expect_peek(RPAREN.to_string()) {
@@ -249,7 +254,8 @@ impl Parser {
     }
 
     fn no_prefix_parse_fn_error(&mut self, t: TokenType) {
-        self.errors.push(format!("no prefix parse function for {} found", t));
+        self.errors
+            .push(format!("no prefix parse function for {} found", t));
     }
 
     fn parse_expression(&mut self, precedence: u8) -> Option<Box<dyn Expression>> {
@@ -257,7 +263,7 @@ impl Parser {
         if prefix.is_none() {
             self.no_prefix_parse_fn_error(self.cur_token.token_type.clone());
             return None;
-        } 
+        }
 
         let mut left_prefix = prefix.unwrap().clone()(self);
 
@@ -299,12 +305,15 @@ impl Parser {
     }
 
     fn peek_error(&mut self, t: TokenType) {
-        self.errors.push(format!("Expected next token to be {}, got {} instead", t, self.peek_token.token_type));
+        self.errors.push(format!(
+            "Expected next token to be {}, got {} instead",
+            t, self.peek_token.token_type
+        ));
     }
 
     fn peek_precedence(&self) -> u8 {
         if let Some(prec) = self.precedences.get(&self.peek_token.token_type) {
-            return (*prec).clone() as u8;    
+            return (*prec).clone() as u8;
         }
 
         LOWEST as u8
@@ -312,7 +321,7 @@ impl Parser {
 
     fn cur_precedece(&self) -> u8 {
         if let Some(prec) = self.precedences.get(&self.cur_token.token_type) {
-            return (*prec).clone() as u8
+            return (*prec).clone() as u8;
         }
 
         LOWEST as u8
@@ -330,25 +339,31 @@ impl Parser {
         return Some(Box::new(Identifier {
             token: parser.cur_token.clone(),
             value: parser.cur_token.literal.clone(),
-        }))
+        }));
     }
 
     fn parse_integer_literal(parser: &mut Parser) -> Option<Box<dyn Expression>> {
         let res = parser.cur_token.literal.parse::<i64>();
 
         if let Err(_) = res {
-            parser.errors.push(format!("Could not parse {} as integer", parser.cur_token.literal));
+            parser.errors.push(format!(
+                "Could not parse {} as integer",
+                parser.cur_token.literal
+            ));
             return None;
         } else {
             return Some(Box::new(IntegerLiteral {
                 token: parser.cur_token.clone(),
                 value: res.unwrap(),
-            }))
+            }));
         }
     }
 
     fn parse_boolean(parser: &mut Parser) -> Option<Box<dyn Expression>> {
-        Some(Box::new(Boolean { token: parser.cur_token.clone(), value: parser.cur_token_is(TRUE.to_string()) }))
+        Some(Box::new(Boolean {
+            token: parser.cur_token.clone(),
+            value: parser.cur_token_is(TRUE.to_string()),
+        }))
     }
 
     fn parse_grouped_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {
@@ -368,7 +383,7 @@ impl Parser {
             token: parser.cur_token.clone(),
             condition: None,
             consequence: None,
-            alternative: None
+            alternative: None,
         };
 
         if !parser.expect_peek(LPAREN.to_string()) {
@@ -423,7 +438,7 @@ impl Parser {
         let lit = FunctionLiteral {
             token: cur_token,
             parameters,
-            body
+            body,
         };
 
         Some(Box::new(lit))
@@ -442,18 +457,24 @@ impl Parser {
         }))
     }
 
-    fn parse_call_expression(parser: &mut Parser, function: Option<Box<dyn Expression>>) -> Option<Box<dyn Expression>> {
+    fn parse_call_expression(
+        parser: &mut Parser,
+        function: Option<Box<dyn Expression>>,
+    ) -> Option<Box<dyn Expression>> {
         let mut exp = CallExpression {
             token: parser.cur_token.clone(),
             function,
-            arguments: vec![]
+            arguments: vec![],
         };
         exp.arguments = parser.parse_call_arguments();
 
         Some(Box::new(exp))
     }
 
-    fn parse_infix_expression(parser: &mut Parser, left: Option<Box<dyn Expression>>) -> Option<Box<dyn Expression>> {
+    fn parse_infix_expression(
+        parser: &mut Parser,
+        left: Option<Box<dyn Expression>>,
+    ) -> Option<Box<dyn Expression>> {
         let mut expr = InfixExpression {
             token: parser.cur_token.clone(),
             operator: parser.cur_token.literal.clone(),

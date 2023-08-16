@@ -1,12 +1,7 @@
-use crate::{
-    lexer::*,
-    parser::*,
-    ast::*,
-    evaluator::*, environment::Environment
-};
+use crate::{ast::*, environment::Environment, evaluator::*, lexer::*, parser::*};
+use std::cell::RefCell;
 use std::io::{self, Write};
 use std::rc::Rc;
-use std::cell::RefCell;
 
 const PROMPT: &str = ">>";
 const MONKEY_FACE: &str = r#"            __,__
@@ -28,8 +23,10 @@ pub fn start() {
         io::stdout().flush().unwrap();
 
         let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer).expect("Failed to read in line");
-        
+        io::stdin()
+            .read_line(&mut buffer)
+            .expect("Failed to read in line");
+
         let lex = Lexer::new(buffer);
         let mut par = Parser::new(lex);
         let program = par.parse_program().expect("Nothing was able to be parsed");
@@ -37,7 +34,7 @@ pub fn start() {
             print_parser_errors(par.errors());
             continue;
         }
-        
+
         if let Some(evaluated) = eval(program.into_node().into(), env.clone()) {
             println!("{}", evaluated.inspect());
         }
