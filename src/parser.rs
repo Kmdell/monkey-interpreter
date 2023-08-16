@@ -30,7 +30,7 @@ type InfixParseFn = Rc<dyn Fn(&mut Parser, Option<Box<dyn Expression>>) -> Optio
 
 pub struct Parser {
     l: Lexer,
-    pub errors: Vec<String>,
+    errors: Vec<String>,
     cur_token: Token,
     peek_token: Token,
     precedences: HashMap<String, Precedence>,
@@ -414,10 +414,16 @@ impl Parser {
             return None;
         }
 
+        let mut body = None;
+        let block = parser.parse_block_statement();
+        if let Some(block) = block {
+            body = Some(Rc::new(*block));
+        }
+
         let lit = FunctionLiteral {
             token: cur_token,
             parameters,
-            body: parser.parse_block_statement()
+            body
         };
 
         Some(Box::new(lit))

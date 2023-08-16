@@ -5,6 +5,8 @@ use crate::{
     evaluator::*, environment::Environment
 };
 use std::io::{self, Write};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 const PROMPT: &str = ">>";
 const MONKEY_FACE: &str = r#"            __,__
@@ -20,7 +22,7 @@ const MONKEY_FACE: &str = r#"            __,__
            '-----'"#;
 
 pub fn start() {
-    let mut env = Environment::new();
+    let env = Rc::new(RefCell::new(Environment::new()));
     loop {
         print!("{} ", PROMPT);
         io::stdout().flush().unwrap();
@@ -31,12 +33,12 @@ pub fn start() {
         let lex = Lexer::new(buffer);
         let mut par = Parser::new(lex);
         let program = par.parse_program().expect("Nothing was able to be parsed");
-        if par.errors.len() != 0 {
-            print_parser_errors(par.errors);
+        if par.errors().len() != 0 {
+            print_parser_errors(par.errors());
             continue;
         }
         
-        if let Some(evaluated) = eval(program.into_node().into(), &mut env) {
+        if let Some(evaluated) = eval(program.into_node().into(), env.clone()) {
             println!("{}", evaluated.inspect());
         }
     }

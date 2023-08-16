@@ -7,6 +7,7 @@ use crate::{
     environment::Environment
 };
 use std::rc::Rc;
+use std::cell::RefCell;
 
 #[cfg(test)]
 mod evaluator_test;
@@ -15,7 +16,7 @@ const NULL: object::Null = object::Null{};
 const TRUE: object::Boolean = object::Boolean{ value: true };
 const FALSE: object::Boolean = object::Boolean{ value: false };
 
-pub fn eval(node: Rc<&dyn Node>, env: &mut Environment) -> Option<Rc<dyn Object>> {
+pub fn eval(node: Rc<&dyn Node>, env: Rc<RefCell<Environment>>) -> Option<Rc<dyn Object>> {
     if let Ok(int) = node.into_integer_literal() {
         return Some(Rc::new(object::Integer { value: int.value }));
     } else if let Ok(boolean) = node.into_bool() {
@@ -24,12 +25,28 @@ pub fn eval(node: Rc<&dyn Node>, env: &mut Environment) -> Option<Rc<dyn Object>
         return eval_identifier(ident, env);
     } else if let Ok(exp_stmt) = node.into_expression() {
         return eval(exp_stmt.expression.as_ref().expect("There is no expression").into_node(), env);
+    } else if let Ok(func) = node.into_func() {
+        let mut params = vec![];
+        for p in &func.parameters {
+            params.push(p.into_identifier().unwrap_or_else(|e| panic!("{}", e)).clone());
+        }
+        return Some(Rc::new(Function { parameters: params, body: func.body.clone().unwrap(), env }));
+    } else if let Ok(call) = node.into_call() {
+        let function = eval(call.function.as_ref().expect("There is no function in call").into_node(), env.clone());
+        if is_error(&function) {
+            return function;
+        }
+        let args = eval_expressions(call.arguments.as_ref(), env);
+        if args.len() == 1 && is_error(&Some(args[0].clone())) {
+            return Some(args[0].clone());
+        }
+        return apply_function(function.expect("There is no function"), args);
     } else if let Ok(let_stmt) = node.into_let() {
-        let val = eval(let_stmt.value.as_ref().expect("There is no value in let statement").into_node(), env);
+        let val = eval(let_stmt.value.as_ref().expect("There is no value in let statement").into_node(), env.clone());
         if is_error(&val) {
             return val;
         }
-        env.set(let_stmt.name.value.clone(), val.expect("There is no value evaluated"));
+        env.borrow_mut().set(let_stmt.name.value.clone(), val.expect("There is no value evaluated"));
     } else if let Ok(block_stmt) = node.into_block() {
         return eval_block_statements(&block_stmt.statements, env);
     } else if let Ok(ret) = node.into_return() {
@@ -47,11 +64,11 @@ pub fn eval(node: Rc<&dyn Node>, env: &mut Environment) -> Option<Rc<dyn Object>
         }
         return Some(eval_prefix_expression(&prefix.operator, right.expect("There is no node")));
     } else if let Ok(infix) = node.into_infix() {
-        let left = eval(infix.left.as_ref().expect("There is no left to the infix").into_node(), env);
+        let left = eval(infix.left.as_ref().expect("There is no left to the infix").into_node(), env.clone());
         if is_error(&left) {
             return left;
         }
-        let right = eval(infix.right.as_ref().expect("There is no right to the infix").into_node(), env);
+        let right = eval(infix.right.as_ref().expect("There is no right to the infix").into_node(), env.clone());
         if is_error(&right) {
             return right;
         }
@@ -63,11 +80,11 @@ pub fn eval(node: Rc<&dyn Node>, env: &mut Environment) -> Option<Rc<dyn Object>
     None
 }
 
-fn eval_program(stmts: &Vec<Box<dyn Statement>>, env: &mut Environment) -> Option<Rc<dyn Object>> {
+fn eval_program(stmts: &Vec<Box<dyn Statement>>, env: Rc<RefCell<Environment>>) -> Option<Rc<dyn Object>> {
     let mut result = None;
 
     for stmt in stmts {
-        result = eval(stmt.into_node(), env);
+        result = eval(stmt.into_node(), env.clone());
         
         if let Some(res) = result.as_ref() {
             if let Ok(ret) = res.into_return() {
@@ -81,11 +98,11 @@ fn eval_program(stmts: &Vec<Box<dyn Statement>>, env: &mut Environment) -> Optio
     result
 }
 
-fn eval_block_statements(stmts: &Vec<Box<dyn Statement>>, env: &mut Environment) -> Option<Rc<dyn Object>> {
+fn eval_block_statements(stmts: &Vec<Box<dyn Statement>>, env: Rc<RefCell<Environment>>) -> Option<Rc<dyn Object>> {
     let mut result = None;
 
     for stmt in stmts {
-        result = eval(stmt.into_node(), env);
+        result = eval(stmt.into_node(), env.clone());
 
         if result.is_some() {
             let rt = result.as_ref().unwrap().object_type();
@@ -99,8 +116,8 @@ fn eval_block_statements(stmts: &Vec<Box<dyn Statement>>, env: &mut Environment)
     result
 }
 
-fn eval_identifier(node: &Identifier, env: &mut Environment) -> Option<Rc<dyn Object>> {
-    let val = env.get(&node.value.clone());
+fn eval_identifier(node: &Identifier, env: Rc<RefCell<Environment>>) -> Option<Rc<dyn Object>> {
+    let val = env.borrow().get(&node.value.clone());
     
     if val.is_none() {
         return Some(new_error(format!("identifier not found: {}", node.value)));
@@ -136,6 +153,20 @@ fn eval_infix_expression(operator: &String, left: Rc<dyn Object>, right: Rc<dyn 
     }
     
     new_error(format!("unknown operator: {} {} {}", left.object_type(), operator, right.object_type()))
+}
+
+fn eval_expressions(exps: &Vec<Box<dyn Expression>>, env: Rc<RefCell<Environment>>) -> Vec<Rc<dyn Object>> {
+    let mut result = vec![];
+    
+    for exp in exps.iter() {
+        let evaluated = eval(exp.into_node(), env.clone());
+        if is_error(&evaluated) {
+            return vec![evaluated.expect("Nothing in evaluated")];
+        }
+        result.push(evaluated.expect("Nothing in evaluated"));
+    }
+
+    result
 }
 
 fn eval_bang_operator_expression(right: Rc<dyn Object>) -> Rc<dyn Object> {
@@ -179,9 +210,9 @@ fn eval_integer_infix_expression(operator: &String, left: Rc<dyn Object>, right:
     }
 }
 
-fn eval_if_expression(if_exp: Rc<&dyn Node>, env: &mut Environment) -> Rc<dyn Object> {
+fn eval_if_expression(if_exp: Rc<&dyn Node>, env: Rc<RefCell<Environment>>) -> Rc<dyn Object> {
     let if_exp = if_exp.into_if().unwrap_or_else(|e| panic!("{}", e));
-    let condition = eval(if_exp.condition.as_ref().expect("There is no condition").into_node(), env).expect("eval got nothing");
+    let condition = eval(if_exp.condition.as_ref().expect("There is no condition").into_node(), env.clone()).expect("eval got nothing");
 
     if is_error(&Some(condition.clone())) {
         return condition;
@@ -196,6 +227,33 @@ fn eval_if_expression(if_exp: Rc<&dyn Node>, env: &mut Environment) -> Rc<dyn Ob
     return Rc::new(NULL);
 }
 
+fn apply_function(func: Rc<dyn Object>, args: Vec<Rc<dyn Object>>) -> Option<Rc<dyn Object>> {
+    if let Ok(function) = func.into_fn() {
+        let extended = extend_function_env(function, &args);
+        let eval = eval(function.body.as_ref().into_node(), extended);
+        return Some(unwrap_return_value(eval.expect("There is not evaluated function body")));
+    } else {
+        return Some(new_error(format!("not a functon: {}", func.object_type())));
+    }
+}
+
+fn extend_function_env(func: &Function, args: &Vec<Rc<dyn Object>>) -> Rc<RefCell<Environment>> {
+    let env = Rc::new(RefCell::new(Environment::new_enc(func.env.clone())));
+    
+    for (index, param) in func.parameters.iter().enumerate() {
+        env.borrow_mut().set(param.value.clone(), args[index].clone().into());
+    }
+
+    env
+}
+
+fn unwrap_return_value(obj: Rc<dyn Object>) -> Rc<dyn Object> {
+    if let Ok(ret) = obj.into_return() {
+        return ret.value.clone();
+    }
+
+    obj
+}
 
 fn is_truthy(obj: Rc<dyn Object>) -> bool {
     if let Ok(_) = obj.into_null() {

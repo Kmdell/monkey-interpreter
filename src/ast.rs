@@ -116,6 +116,7 @@ impl Node for LetStatement {
 
 impl Statement for LetStatement {}
 
+#[derive(Clone)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,
@@ -387,7 +388,7 @@ impl Statement for BlockStatement {}
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<Box<dyn Expression>>,
-    pub body: Option<Box<BlockStatement>>
+    pub body: Option<Rc<BlockStatement>>
 }
 
 impl Node for FunctionLiteral {

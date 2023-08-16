@@ -1,4 +1,7 @@
 use std::rc::Rc;
+use std::cell::RefCell;
+
+use crate::{ast::{Identifier, BlockStatement, Node}, environment::Environment};
 
 pub type ObjectType = String;
 
@@ -7,6 +10,7 @@ pub const BOOLEAN_OBJ: &str = "BOOLEAN";
 pub const NULL_OBJ: &str = "NULL";
 pub const RETURN_VALUE_OBJ: &str = "RETURN";
 pub const ERROR_OBJ: &str = "ERROR";
+pub const FUNCTION_OBJ: &str = "FUNCTION";
 
 pub trait Object {
     fn object_type(&self) -> ObjectType;
@@ -25,6 +29,9 @@ pub trait Object {
     }
     fn into_error(&self) -> Result<&Error, String> {
         Err("Not a Error".into())
+    }
+    fn into_fn(&self) -> Result<&Function, String> {
+        Err("Not a Function".into())
     }
 }
 
@@ -102,6 +109,35 @@ impl Object for Error {
         self.message.clone()
     }
     fn into_error(&self) -> Result<&Error, String> {
+        Ok(self)
+    }
+}
+
+pub struct Function {
+    pub parameters: Vec<Identifier>,
+    pub body: Rc<BlockStatement>,
+    pub env: Rc<RefCell<Environment>>
+}
+
+impl Object for Function {
+    fn object_type(&self) -> ObjectType {
+        FUNCTION_OBJ.into()
+    }
+    fn inspect(&self) -> String {
+        let mut buf = String::new();
+
+        let mut params = vec![];
+        self.parameters.iter().for_each(|p| params.push(p.to_string()));
+
+        buf.push_str("fn(");
+        buf.push_str(&params.join(", "));
+        buf.push_str(") {\n");
+        buf.push_str(&self.body.to_string());
+        buf.push_str("}\n");
+
+        buf
+    }
+    fn into_fn(&self) -> Result<&Function, String> {
         Ok(self)
     }
 }

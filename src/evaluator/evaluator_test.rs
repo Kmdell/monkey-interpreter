@@ -10,9 +10,9 @@ fn test_eval(input: String) -> Rc<dyn Object> {
     let l = Lexer::new(input);
     let mut p = Parser::new(l);
     let prog = p.parse_program();
-    let mut env = Environment::new();
+    let env = Environment::new();
 
-    return eval(prog.expect("There is no program parsed").into_node(), &mut env).unwrap();
+    return eval(prog.expect("There is no program parsed").into_node(), Rc::new(RefCell::new(env))).unwrap();
 }
 
 fn test_integer_object(obj: Rc<dyn Object>, expected: i64) {
@@ -32,7 +32,7 @@ fn test_boolean_object(obj: Rc<dyn Object>, expected: bool) {
 }
 
 fn test_null_object(obj: Rc<dyn Object>) {
-    let result = obj.into_null().unwrap_or_else(|e| panic!("{}", e));
+    obj.into_null().unwrap_or_else(|e| panic!("{}", e));
 }
 
 #[test]
@@ -343,7 +343,7 @@ fn test_error_handling() {
     struct Test {
         input: String,
         expected_message: String
-    };
+    }
 
     let tests = vec![
         Test {
@@ -433,3 +433,84 @@ fn test_let_statements() {
         }
     }
 }
+
+#[test]
+fn test_function_object() {
+    let input = "fn(x) { x + 2; }".into();
+
+    let evaluated = test_eval(input);
+    let func = evaluated.into_fn().unwrap_or_else(|e| panic!("{}", e));
+
+    if func.parameters.len() != 1 {
+        panic!("function has wrong parameters. Parameters={}", func.parameters.len());
+    }
+
+    if func.parameters[0].to_string() != "x" {
+        panic!("parameter is not 'x'. got={}", func.parameters[0].to_string());
+    }
+
+    let expected_body = "(x + 2)".to_string();
+
+    if func.body.to_string() != expected_body {
+        panic!("body is not {}. got={}", expected_body, func.body.to_string());
+    }
+}
+
+#[test]
+fn test_function_application() {
+    struct Test {
+        input: String,
+        expected: String
+    }   
+
+    let tests = vec![
+        Test {
+            input: "let identity = fn(x) { x; }; identity(5);".into(),
+            expected: "5".into()
+        },
+        Test {
+            input: "let identity = fn(x) { return x; }; identity(5);".into(),
+            expected: "5".into()
+        },
+        Test {
+            input: "let double = fn(x) { x * 2; }; double(5);".into(),
+            expected: "10".into()
+        },
+        Test {
+            input: "let add = fn(x, y) { x + y; }; add(5, 5);".into(),
+            expected: "10".into()
+        },
+        Test {
+            input: "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));".into(),
+            expected: "20".into()
+        },
+        Test {
+            input: "fn(x) { return x; }(5)".into(),
+            expected: "5".into()
+        },
+    ];
+
+    for tt in tests {
+        if let Ok(int) = tt.expected.parse::<i64>() {
+            println!("Running Test");
+            let obj = test_eval(tt.input);
+            println!("{}", obj.object_type());
+            test_integer_object(obj, int);
+            println!("Test passed");
+        } else {
+            panic!("Test not implemented for anything other than i64");
+        }
+    }
+}
+
+#[test]
+fn test_closure() {
+    let input = "
+let new_adder = fn(x) { fn(y) { x + y } };
+
+let add_two = new_adder(2);
+add_two(2);
+".into();
+
+    test_integer_object(test_eval(input), 4);
+}   
