@@ -14,6 +14,7 @@ enum Precedence {
     PRODUCT = 5,     // *
     PREFIX = 6,      // -X or !X
     CALL = 7,        //myFunction(X)
+    INDEX = 8,       // array[index]
 }
 
 type PrefixParseFn = Rc<dyn Fn(&mut Parser) -> Option<Box<dyn Expression>>>;
@@ -50,6 +51,7 @@ impl Parser {
                 (SLASH.into(), Precedence::PRODUCT),
                 (ASTERICK.into(), Precedence::PRODUCT),
                 (LPAREN.into(), Precedence::CALL),
+                (LBRACKET.into(), Precedence::INDEX),
             ]),
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
@@ -63,15 +65,21 @@ impl Parser {
             LPAREN.to_string(),
             Rc::new(Parser::parse_grouped_expression),
         );
+        p.register_prefix(LBRACKET.to_string(), Rc::new(Parser::parse_array_literal));
         p.register_prefix(IF.to_string(), Rc::new(Parser::parse_if_expression));
         p.register_prefix(
             FUNCTION.to_string(),
             Rc::new(Parser::parse_function_literal),
         );
+        p.register_prefix(STRING.to_string(), Rc::new(Parser::parse_string_literal));
         p.register_prefix(BANG.to_string(), Rc::new(Parser::parse_prefix_expression));
         p.register_prefix(MINUS.to_string(), Rc::new(Parser::parse_prefix_expression));
 
         p.register_infix(LPAREN.to_string(), Rc::new(Parser::parse_call_expression));
+        p.register_infix(
+            LBRACKET.to_string(),
+            Rc::new(Parser::parse_index_expression),
+        );
         p.register_infix(PLUS.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(MINUS.to_string(), Rc::new(Parser::parse_infix_expression));
         p.register_infix(SLASH.to_string(), Rc::new(Parser::parse_infix_expression));
@@ -223,36 +231,6 @@ impl Parser {
         idents
     }
 
-    fn parse_call_arguments(&mut self) -> Vec<Box<dyn Expression>> {
-        let mut args = vec![];
-
-        if self.peek_token_is(RPAREN.to_string()) {
-            self.next_token();
-            return args;
-        }
-
-        self.next_token();
-        args.push(
-            self.parse_expression(LOWEST as u8)
-                .expect("Nothing was parsed"),
-        );
-
-        while self.peek_token_is(COMMA.to_string()) {
-            self.next_token();
-            self.next_token();
-            args.push(
-                self.parse_expression(LOWEST as u8)
-                    .expect("Nothing was parsed"),
-            );
-        }
-
-        if !self.expect_peek(RPAREN.to_string()) {
-            return vec![];
-        }
-
-        args
-    }
-
     fn no_prefix_parse_fn_error(&mut self, t: TokenType) {
         self.errors
             .push(format!("no prefix parse function for {} found", t));
@@ -280,6 +258,30 @@ impl Parser {
         }
 
         left_prefix
+    }
+
+    fn parse_expression_list(&mut self, end: TokenType) -> Vec<Box<dyn Expression>> {
+        let mut list = vec![];
+
+        if self.peek_token_is(end.clone()) {
+            self.next_token();
+            return list;
+        }
+
+        self.next_token();
+        list.push(self.parse_expression(LOWEST as u8).unwrap().into());
+
+        while self.peek_token_is(COMMA.to_string()) {
+            self.next_token();
+            self.next_token();
+            list.push(self.parse_expression(LOWEST as u8).unwrap().into());
+        }
+
+        if !self.expect_peek(end) {
+            return vec![];
+        }
+
+        list
     }
 
     fn expect_peek(&mut self, token_type: TokenType) -> bool {
@@ -378,6 +380,13 @@ impl Parser {
         exp
     }
 
+    fn parse_array_literal(parser: &mut Parser) -> Option<Box<dyn Expression>> {
+        Some(Box::new(ArrayLiteral {
+            token: parser.cur_token.clone(),
+            elements: parser.parse_expression_list(RBRACKET.to_string()),
+        }))
+    }
+
     fn parse_if_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {
         let mut expression = IfExpression {
             token: parser.cur_token.clone(),
@@ -444,6 +453,13 @@ impl Parser {
         Some(Box::new(lit))
     }
 
+    fn parse_string_literal(parser: &mut Parser) -> Option<Box<dyn Expression>> {
+        Some(Box::new(StringLiteral {
+            token: parser.cur_token.clone(),
+            value: parser.cur_token.literal.clone(),
+        }))
+    }
+
     fn parse_prefix_expression(parser: &mut Parser) -> Option<Box<dyn Expression>> {
         let cur_token = parser.cur_token.clone();
         let literal = parser.cur_token.literal.clone();
@@ -466,7 +482,27 @@ impl Parser {
             function,
             arguments: vec![],
         };
-        exp.arguments = parser.parse_call_arguments();
+        exp.arguments = parser.parse_expression_list(RPAREN.to_string());
+
+        Some(Box::new(exp))
+    }
+
+    fn parse_index_expression(
+        parser: &mut Parser,
+        left: Option<Box<dyn Expression>>,
+    ) -> Option<Box<dyn Expression>> {
+        let mut exp = IndexExpression {
+            token: parser.cur_token.clone(),
+            left,
+            index: None,
+        };
+
+        parser.next_token();
+        exp.index = parser.parse_expression(LOWEST as u8);
+
+        if !parser.expect_peek(RBRACKET.to_string()) {
+            return None;
+        }
 
         Some(Box::new(exp))
     }

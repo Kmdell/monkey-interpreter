@@ -27,7 +27,7 @@ pub fn eval(
             value: string.value.clone(),
         }));
     } else if let Ok(ident) = node.into_identifier() {
-        return eval_identifier(ident, env, builtins.clone());
+        return eval_identifier(ident, env);
     } else if let Ok(exp_stmt) = node.into_expression() {
         return eval(
             exp_stmt
@@ -64,7 +64,7 @@ pub fn eval(
         if is_error(&function) {
             return function;
         }
-        let args = eval_expressions(call.arguments.as_ref(), env, builtins.clone());
+        let args = eval_expressions(call.arguments.as_ref(), env, builtins);
         if args.len() == 1 && is_error(&Some(args[0].clone())) {
             return Some(args[0].clone());
         }
@@ -76,7 +76,7 @@ pub fn eval(
                 .as_ref()
                 .expect("There is no value in let statement")
                 .into_node(),
-            env.clone(),
+            env,
             builtins,
         );
         if is_error(&val) {
@@ -86,35 +86,8 @@ pub fn eval(
             let_stmt.name.value.clone(),
             val.expect("There is no value evaluated"),
         );
-    } else if let Ok(array) = node.into_array() {
-        let elems = eval_expressions(&array.elements, env, builtins);
-        if elems.len() == 1 && is_error(&Some(elems[0].clone())) {
-            return Some(elems[0].clone());
-        }
-        return Some(Rc::new(Array { elements: elems }));
     } else if let Ok(block_stmt) = node.into_block() {
         return eval_block_statements(&block_stmt.statements, env, builtins);
-    } else if let Ok(index) = node.into_ind() {
-        let left = eval(
-            index.left.as_ref().expect("left is empty").into_node(),
-            env.clone(),
-            builtins.clone(),
-        );
-        if is_error(&left) {
-            return left;
-        }
-        let i = eval(
-            index.index.as_ref().expect("index is empty").into_node(),
-            env,
-            builtins,
-        );
-        if is_error(&i) {
-            return i;
-        }
-        return eval_index_expression(
-            left.expect("There is no left"),
-            i.expect("There is no index"),
-        );
     } else if let Ok(ret) = node.into_return() {
         let val = eval(
             ret.return_value
@@ -156,8 +129,8 @@ pub fn eval(
                 .as_ref()
                 .expect("There is no left to the infix")
                 .into_node(),
-            env.clone(),
-            builtins.clone(),
+            env,
+            builtins,
         );
         if is_error(&left) {
             return left;
@@ -194,7 +167,7 @@ fn eval_program(
     let mut result = None;
 
     for stmt in stmts {
-        result = eval(stmt.into_node(), env.clone(), builtins.clone());
+        result = eval(stmt.into_node(), env, builtins);
 
         if let Some(res) = result.as_ref() {
             if let Ok(ret) = res.into_return() {
@@ -216,7 +189,7 @@ fn eval_block_statements(
     let mut result = None;
 
     for stmt in stmts {
-        result = eval(stmt.into_node(), env.clone(), builtins.clone());
+        result = eval(stmt.into_node(), env, builtins);
 
         if result.is_some() {
             let rt = result.as_ref().unwrap().object_type();
@@ -230,20 +203,14 @@ fn eval_block_statements(
     result
 }
 
-fn eval_identifier(
-    node: &Identifier,
-    env: Rc<RefCell<Environment>>,
-    builtins: builtins::Builtins,
-) -> Option<Rc<dyn Object>> {
-    if let Some(val) = env.borrow().get(&node.value.clone()) {
-        return Some(val.clone());
+fn eval_identifier(node: &Identifier, env: Rc<RefCell<Environment>>) -> Option<Rc<dyn Object>> {
+    let val = env.borrow().get(&node.value.clone());
+
+    if val.is_none() {
+        return Some(new_error(format!("identifier not found: {}", node.value)));
     }
 
-    if let Some(builtin) = builtins.get(&node.value.clone()) {
-        return Some(builtin.clone());
-    }
-
-    Some(new_error(format!("identifier not found: {}", node.value)))
+    val
 }
 
 fn eval_prefix_expression(operator: &String, right: Rc<dyn Object>) -> Rc<dyn Object> {
@@ -300,7 +267,7 @@ fn eval_expressions(
     let mut result = vec![];
 
     for exp in exps.iter() {
-        let evaluated = eval(exp.into_node(), env.clone(), builtins.clone());
+        let evaluated = eval(exp.into_node(), env, builtins);
         if is_error(&evaluated) {
             return vec![evaluated.expect("Nothing in evaluated")];
         }
@@ -407,8 +374,8 @@ fn eval_if_expression(
             .as_ref()
             .expect("There is no condition")
             .into_node(),
-        env.clone(),
-        builtins.clone(),
+        env,
+        builtins,
     )
     .expect("eval got nothing");
 
@@ -443,31 +410,6 @@ fn eval_if_expression(
     return Rc::new(NULL);
 }
 
-fn eval_index_expression(left: Rc<dyn Object>, right: Rc<dyn Object>) -> Option<Rc<dyn Object>> {
-    if left.object_type() == ARRAY_OBJ && right.object_type() == INTEGER_OBJ {
-        return eval_array_index_expression(left, right);
-    }
-
-    Some(new_error(format!(
-        "index operator not supported: {}",
-        left.object_type()
-    )))
-}
-
-fn eval_array_index_expression(
-    array: Rc<dyn Object>,
-    index: Rc<dyn Object>,
-) -> Option<Rc<dyn Object>> {
-    let array_obj = array.into_array().unwrap_or_else(|e| panic!("{}", e));
-    let idx = index.into_int().unwrap_or_else(|e| panic!("{}", e)).value;
-    let max = array_obj.elements.len() as i64 - 1;
-    if idx < 0 || idx > max {
-        return Some(Rc::new(NULL));
-    }
-
-    return Some(array_obj.elements[idx as usize].clone());
-}
-
 fn apply_function(
     func: Rc<dyn Object>,
     args: Vec<Rc<dyn Object>>,
@@ -479,8 +421,6 @@ fn apply_function(
         return Some(unwrap_return_value(
             eval.expect("There is not evaluated function body"),
         ));
-    } else if let Ok(function) = func.into_built() {
-        return Some(function.func.clone()(args));
     } else {
         return Some(new_error(format!("not a functon: {}", func.object_type())));
     }

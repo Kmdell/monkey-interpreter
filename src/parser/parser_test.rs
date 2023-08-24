@@ -510,6 +510,14 @@ fn test_operator_precedence_parsing() {
             "add(a + b + c * d / f + g)".into(),
             "add((((a + b) + ((c * d) / f)) + g))".into(),
         ),
+        Test::new(
+            "a * [1, 2, 3, 4][b * c] * d".into(),
+            "((a * ([1, 2, 3, 4][(b * c)])) * d)".into(),
+        ),
+        Test::new(
+            "add(a * b[2], b[1], 2 * [1, 2][1])".into(),
+            "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))".into(),
+        ),
     ];
 
     for test in tests {
@@ -1027,4 +1035,97 @@ fn test_return_statements() {
             tt.expected_value,
         );
     }
+}
+
+#[test]
+fn test_string_literal_expression() {
+    let input = "\"hello world\"".into();
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let stmt = prog
+        .as_ref()
+        .expect("There was no program parsed")
+        .statements[0]
+        .as_ref()
+        .into_expression()
+        .unwrap_or_else(|e| panic!("{}", e));
+    let lit = stmt
+        .expression
+        .as_ref()
+        .expect("Statement has no expression")
+        .into_string()
+        .expect("expression not a string literal");
+
+    if lit.value != "hello world" {
+        panic!("literal.value not {}, got='{}'", "hello world", lit.value);
+    }
+}
+
+#[test]
+fn test_parsing_array_literals() {
+    let input = "[1, 2 * 2, 3 + 3]".into();
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let stmt = prog
+        .as_ref()
+        .expect("There is no program parsed")
+        .statements[0]
+        .into_expression()
+        .unwrap_or_else(|e| panic!("{}", e));
+
+    let array = stmt
+        .expression
+        .as_ref()
+        .expect("There is no expression")
+        .into_array()
+        .unwrap_or_else(|e| panic!("{}", e));
+
+    if array.elements.len() != 3 {
+        panic!("len(array.Elements) not 3, got={}", array.elements.len());
+    }
+
+    test_integer_literal(&array.elements[0], 1);
+    test_infix_expression(&array.elements[1], "2".into(), "*".into(), "2".into());
+    test_infix_expression(&array.elements[2], "3".into(), "+".into(), "3".into());
+}
+
+#[test]
+fn test_parsing_index_expressions() {
+    let input = "myArray[1 + 1]".into();
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let stmt = prog.as_ref().expect("No program parsed").statements[0]
+        .as_ref()
+        .into_expression()
+        .unwrap_or_else(|e| panic!("{}", e));
+    let index_exp = stmt
+        .expression
+        .as_ref()
+        .expect("no expression")
+        .into_ind()
+        .unwrap_or_else(|e| panic!("{}", e));
+
+    test_identifier(
+        &index_exp.left.as_ref().expect("No left in index"),
+        "myArray".into(),
+    );
+
+    test_infix_expression(
+        &index_exp.index.as_ref().expect("There is no index"),
+        "1".into(),
+        "+".into(),
+        "1".into(),
+    )
 }

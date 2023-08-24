@@ -1,5 +1,5 @@
 use super::token::*;
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 pub trait Node {
     fn token_literal(&self) -> String;
@@ -42,6 +42,18 @@ pub trait Node {
     }
     fn into_program(&self) -> Result<&Program, String> {
         Err("Not a Program".into())
+    }
+    fn into_string(&self) -> Result<&StringLiteral, String> {
+        Err("Not a StringLiteral".into())
+    }
+    fn into_array(&self) -> Result<&ArrayLiteral, String> {
+        Err("Not a ArrayLiteral".into())
+    }
+    fn into_ind(&self) -> Result<&IndexExpression, String> {
+        Err("Not a IndexExpression".into())
+    }
+    fn into_hash(&self) -> Result<&HashLiteral, String> {
+        Err("Not a HashLiteral".into())
     }
     fn into_node(&self) -> Rc<&dyn Node>;
 }
@@ -460,3 +472,123 @@ impl Node for CallExpression {
 }
 
 impl Expression for CallExpression {}
+
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: String,
+}
+
+impl Node for StringLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn to_string(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn into_string(&self) -> Result<&StringLiteral, String> {
+        Ok(self)
+    }
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
+    }
+}
+
+impl Expression for StringLiteral {}
+
+pub struct ArrayLiteral {
+    pub token: Token,
+    pub elements: Vec<Box<dyn Expression>>,
+}
+
+impl Node for ArrayLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn to_string(&self) -> String {
+        let mut buf = String::from("[");
+
+        let mut buffers = vec![];
+        for el in &self.elements {
+            buffers.push(el.to_string());
+        }
+        buf.push_str(&buffers.join(", "));
+        buf.push_str("]");
+
+        buf
+    }
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
+    }
+    fn into_array(&self) -> Result<&ArrayLiteral, String> {
+        Ok(self)
+    }
+}
+
+impl Expression for ArrayLiteral {}
+
+pub struct IndexExpression {
+    pub token: Token,
+    pub left: Option<Box<dyn Expression>>,
+    pub index: Option<Box<dyn Expression>>,
+}
+
+impl Node for IndexExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn to_string(&self) -> String {
+        let mut buf = String::from("(");
+        if let Some(left) = self.left.as_ref() {
+            buf.push_str(&left.to_string());
+        }
+        buf.push_str("[");
+        if let Some(index) = self.index.as_ref() {
+            buf.push_str(&index.to_string());
+        }
+        buf.push_str("])");
+
+        buf
+    }
+    fn into_ind(&self) -> Result<&IndexExpression, String> {
+        Ok(self)
+    }
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
+    }
+}
+
+impl Expression for IndexExpression {}
+
+pub struct HashLiteral {
+    pub token: Token,
+    pub pairs: HashMap<Box<dyn Expression>, Box<dyn Expression>>,
+}
+
+impl Node for HashLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn to_string(&self) -> String {
+        let mut buf = String::from("{");
+
+        let mut pairs = vec![];
+        for (key, item) in self.pairs.iter() {
+            let pair = key.to_string() + ":" + &item.to_string();
+            pairs.push(pair);
+        }
+
+        buf.push_str(&pairs.join(", "));
+        buf.push_str("}");
+
+        buf
+    }
+    fn into_node(&self) -> Rc<&dyn Node> {
+        Rc::new(self)
+    }
+    fn into_hash(&self) -> Result<&HashLiteral, String> {
+        Ok(self)
+    }
+}
+
+impl Expression for HashLiteral {}

@@ -99,8 +99,17 @@ impl Lexer {
             '}' => {
                 tok = token::Token::new(token::RBRACE.to_string(), self.ch.to_string());
             }
+            '[' => {
+                tok = token::Token::new(token::LBRACKET.to_string(), self.ch.to_string());
+            }
+            ']' => {
+                tok = token::Token::new(token::RBRACKET.to_string(), self.ch.to_string());
+            }
             '\0' => {
                 tok = token::Token::new(token::EOF.to_string(), "".to_string());
+            }
+            '"' => {
+                tok = token::Token::new(token::STRING.to_string(), self.read_string());
             }
             _ => {
                 if self.is_letter() {
@@ -133,6 +142,18 @@ impl Lexer {
 
         while self.is_digit() {
             self.read_char();
+        }
+
+        self.input[pos..self.pos].iter().collect()
+    }
+
+    fn read_string(&mut self) -> String {
+        let pos = self.pos + 1;
+        loop {
+            self.read_char();
+            if self.ch == '"' || self.ch == '\0' {
+                break;
+            }
         }
 
         self.input[pos..self.pos].iter().collect()

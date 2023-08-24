@@ -7,6 +7,7 @@ use crate::{
 };
 
 pub type ObjectType = String;
+type BuiltinFunction = Rc<dyn Fn(Vec<Rc<dyn Object>>) -> Rc<dyn Object>>;
 
 pub const INTEGER_OBJ: &str = "INTEGER";
 pub const BOOLEAN_OBJ: &str = "BOOLEAN";
@@ -14,27 +15,39 @@ pub const NULL_OBJ: &str = "NULL";
 pub const RETURN_VALUE_OBJ: &str = "RETURN";
 pub const ERROR_OBJ: &str = "ERROR";
 pub const FUNCTION_OBJ: &str = "FUNCTION";
+pub const STRING_OBJ: &str = "STRING";
+pub const BUILTIN_OBJ: &str = "BUILTIN";
+pub const ARRAY_OBJ: &str = "ARRAY";
 
 pub trait Object {
     fn object_type(&self) -> ObjectType;
     fn inspect(&self) -> String;
     fn into_int(&self) -> Result<&Integer, String> {
-        Err("Not an Integer".into())
+        Err(format!("Not an Integer, got={}", self.object_type()))
     }
     fn into_bool(&self) -> Result<&Boolean, String> {
-        Err("Not a Boolean".into())
+        Err(format!("Not a Boolean, got={}", self.object_type()))
     }
     fn into_null(&self) -> Result<&Null, String> {
-        Err("Not a Null".into())
+        Err(format!("Not a Null, got={}", self.object_type()))
     }
     fn into_return(&self) -> Result<&ReturnValue, String> {
-        Err("Not a ReturnValue".into())
+        Err(format!("Not a ReturnValue, got={}", self.object_type()))
     }
     fn into_error(&self) -> Result<&Error, String> {
-        Err("Not a Error".into())
+        Err(format!("Not a Error, got={}", self.object_type()))
     }
     fn into_fn(&self) -> Result<&Function, String> {
-        Err("Not a Function".into())
+        Err(format!("Not a Function, got={}", self.object_type()))
+    }
+    fn into_string(&self) -> Result<&OString, String> {
+        Err(format!("Not a OString, got={}", self.object_type()))
+    }
+    fn into_built(&self) -> Result<&Builtin, String> {
+        Err(format!("Not a Builtin, got={}", self.object_type()))
+    }
+    fn into_array(&self) -> Result<&Array, String> {
+        Err(format!("Not an Array, got={}", self.object_type()))
     }
 }
 
@@ -143,6 +156,62 @@ impl Object for Function {
         buf
     }
     fn into_fn(&self) -> Result<&Function, String> {
+        Ok(self)
+    }
+}
+
+pub struct OString {
+    pub value: String,
+}
+
+impl Object for OString {
+    fn object_type(&self) -> ObjectType {
+        STRING_OBJ.into()
+    }
+    fn inspect(&self) -> String {
+        self.value.clone()
+    }
+    fn into_string(&self) -> Result<&OString, String> {
+        Ok(self)
+    }
+}
+
+pub struct Builtin {
+    pub func: BuiltinFunction,
+}
+
+impl Object for Builtin {
+    fn object_type(&self) -> ObjectType {
+        BUILTIN_OBJ.into()
+    }
+    fn inspect(&self) -> String {
+        "builtin function".into()
+    }
+    fn into_built(&self) -> Result<&Builtin, String> {
+        Ok(self)
+    }
+}
+
+pub struct Array {
+    pub elements: Vec<Rc<dyn Object>>,
+}
+
+impl Object for Array {
+    fn object_type(&self) -> ObjectType {
+        ARRAY_OBJ.into()
+    }
+    fn inspect(&self) -> String {
+        let mut buf = String::from("[");
+        let mut elems = vec![];
+        for el in self.elements.iter() {
+            elems.push(el.inspect());
+        }
+        buf.push_str(&elems.join(", "));
+        buf.push_str("]");
+
+        buf
+    }
+    fn into_array(&self) -> Result<&Array, String> {
         Ok(self)
     }
 }

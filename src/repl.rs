@@ -18,6 +18,7 @@ const MONKEY_FACE: &str = r#"            __,__
 
 pub fn start() {
     let env = Rc::new(RefCell::new(Environment::new()));
+    let builtins = builtins::new_builtins();
     loop {
         print!("{} ", PROMPT);
         io::stdout().flush().unwrap();
@@ -35,7 +36,7 @@ pub fn start() {
             continue;
         }
 
-        if let Some(evaluated) = eval(program.into_node().into(), env.clone()) {
+        if let Some(evaluated) = eval(program.into_node().into(), env.clone(), builtins.clone()) {
             println!("{}", evaluated.inspect());
         }
     }

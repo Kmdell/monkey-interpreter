@@ -8,6 +8,7 @@ pub const EOF: &str = "EOF";
 // Identifiers and literals
 pub const IDENT: &str = "IDENT"; // add, x, y...
 pub const INT: &str = "INT"; // 1343234
+pub const STRING: &str = "STRING";
 
 // Operators
 pub const ASSIGN: &str = "=";
@@ -30,6 +31,8 @@ pub const LPAREN: &str = "(";
 pub const RPAREN: &str = ")";
 pub const LBRACE: &str = "{";
 pub const RBRACE: &str = "}";
+pub const LBRACKET: &str = "[";
+pub const RBRACKET: &str = "]";
 
 // Keywords
 pub const FUNCTION: &str = "FUNCTION";

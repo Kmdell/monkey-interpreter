@@ -101,6 +101,15 @@ mod tests {
             Test::new(token::NOT_EQ.to_string(), "!=".to_string()),
             Test::new(token::INT.to_string(), "9".to_string()),
             Test::new(token::SEMICOLON.to_string(), ";".to_string()),
+            Test::new(token::STRING.to_string(), "foobar".to_string()),
+            Test::new(token::STRING.to_string(), "foo bar".to_string()),
+            Test::new(token::LBRACKET.to_string(), "[".to_string()),
+            Test::new(token::INT.to_string(), "1".to_string()),
+            Test::new(token::COMMA.to_string(), ",".to_string()),
+            Test::new(token::INT.to_string(), "2".to_string()),
+            Test::new(token::RBRACKET.to_string(), "]".to_string()),
+            Test::new(token::SEMICOLON.to_string(), ";".to_string()),
+            Test::new(token::EOF.to_string(), "".to_string()),
         ];
 
         let input: String = "let five = 5;
@@ -122,6 +131,9 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;
+\"foobar\"
+\"foo bar\"
+[1, 2];
 "
         .to_string();
 
@@ -138,10 +150,9 @@ if (5 < 10) {
                 tok.token_type
             );
 
-            println!("{} | {}", tok.literal, tt.expected_literal);
             assert!(
                 tok.literal.eq(&tt.expected_literal),
-                "tests[{}] - literal wrong, expectec=\"{}\", got=\"{}\"",
+                "tests[{}] - literal wrong, expected=\"{}\", got=\"{}\"",
                 i,
                 tt.expected_literal,
                 tok.literal
