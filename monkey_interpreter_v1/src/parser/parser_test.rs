@@ -1,16 +1,4 @@
-use crate::{ast::*, lexer::*, parser::*, token::*};
-
-struct IdentTest {
-    expected_identifier: String,
-}
-
-impl IdentTest {
-    fn new(expected_identifier: &str) -> Self {
-        IdentTest {
-            expected_identifier: expected_identifier.to_string(),
-        }
-    }
-}
+use crate::{ast::*, parser::*};
 
 fn test_integer_literal(il: &Box<dyn Expression>, value: i64) {
     let integ = il

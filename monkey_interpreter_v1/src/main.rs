@@ -1,4 +1,4 @@
-use monkey_intepreter::*;
+use monkey_interpreter_v1::repl;
 use whoami;
 
 fn main() {
