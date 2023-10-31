@@ -1,10 +1,14 @@
-#[derive(Debug, PartialEq, Clone)]
+use std::rc::Rc;
+
+pub type Str = Rc<str>;
+
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
 pub enum Token {
     ILLEGAL,
     EOF,
 
-    IDENT(String),
-    INT(String),
+    IDENT(Str),
+    INT(Str),
 
     ASSIGN,
     PLUS,

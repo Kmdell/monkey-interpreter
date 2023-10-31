@@ -130,29 +130,29 @@ impl<'a> Lexer<'a> {
         tok
     }
 
-    fn read_identifier(&mut self) -> &'a str {
+    fn read_identifier(&mut self) -> Str {
         let pos = self.pos;
         while is_letter(self.ch) {
             self.read_char();
         }
 
-        &self.input[pos..self.pos]
+        self.input[pos..self.pos].into()
     }
 
-    fn read_number(&mut self) -> String {
+    fn read_number(&mut self) -> Str {
         let pos = self.pos;
         while is_digit(self.ch) {
             self.read_char();
         }
 
-        String::from(&self.input[pos..self.pos])
+        self.input[pos..self.pos].into()
     }
 
-    fn lookup_ident(&self, ident: &str) -> Token {
-        if let Some(tok) = self.keywords.get(ident) {
+    fn lookup_ident(&self, ident: Str) -> Token {
+        if let Some(tok) = self.keywords.get(&(*ident)) {
             return tok.clone();
         }
-        Token::IDENT(String::from(ident))
+        Token::IDENT(ident)
     }
 
     fn skip_whitespace(&mut self) {
