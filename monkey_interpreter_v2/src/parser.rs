@@ -27,7 +27,7 @@ enum Prec {
     CALL,
 }
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     l: Lexer<'a>,
     errors: Vec<String>,
     cur_token: Token,
@@ -38,7 +38,7 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    fn new(mut l: Lexer<'a>) -> Self {
+    pub fn new(mut l: Lexer<'a>) -> Self {
         let cur = l.next_token();
         let peek = l.next_token();
 
@@ -58,6 +58,7 @@ impl<'a> Parser<'a> {
                 (Token::MINUS, Prec::SUM),
                 (Token::SLASH, Prec::PRODUCT),
                 (Token::ASTERICK, Prec::PRODUCT),
+                (Token::LPAREN, Prec::CALL),
             ]),
         };
 
@@ -69,6 +70,7 @@ impl<'a> Parser<'a> {
         p.register_prefix(&Token::FALSE, Rc::new(parse_boolean));
         p.register_prefix(&Token::LPAREN, Rc::new(parse_grouped_expression));
         p.register_prefix(&Token::IF, Rc::new(parse_if_expression));
+        p.register_prefix(&Token::FUNCTION, Rc::new(parse_function_literal));
 
         p.register_infix(&Token::PLUS, Rc::new(parse_infix_expression));
         p.register_infix(&Token::MINUS, Rc::new(parse_infix_expression));
@@ -78,6 +80,7 @@ impl<'a> Parser<'a> {
         p.register_infix(&Token::NOTEQ, Rc::new(parse_infix_expression));
         p.register_infix(&Token::LT, Rc::new(parse_infix_expression));
         p.register_infix(&Token::GT, Rc::new(parse_infix_expression));
+        p.register_infix(&Token::LPAREN, Rc::new(parse_call_expression));
 
         p
     }
@@ -87,7 +90,7 @@ impl<'a> Parser<'a> {
         self.peek_token = self.l.next_token();
     }
 
-    fn parse_program(&mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut prog = Program { stmts: vec![] };
 
         while self.cur_token != Token::EOF {
@@ -123,24 +126,27 @@ impl<'a> Parser<'a> {
             return Stmt::Nil;
         }
 
-        while !self.cur_token_is(&Token::SEMICOLON) {
+        self.next_token();
+
+        let value = self.parse_expression(Prec::LOWEST);
+
+        if self.peek_token_is(&Token::SEMICOLON) {
             self.next_token();
         }
 
-        Stmt::LetStatement {
-            ident,
-            value: Expr::Nil,
-        }
+        Stmt::LetStatement { ident, value }
     }
 
     fn parse_return_stmt(&mut self) -> Stmt {
         self.next_token();
 
-        while !self.cur_token_is(&Token::SEMICOLON) {
+        let value = self.parse_expression(Prec::LOWEST);
+
+        while self.peek_token_is(&Token::SEMICOLON) {
             self.next_token();
         }
 
-        Stmt::ReturnStatement { value: Expr::Nil }
+        Stmt::ReturnStatement { value }
     }
 
     fn parse_expression_stmt(&mut self) -> Stmt {
@@ -201,7 +207,7 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn errors(&self) -> &Vec<String> {
+    pub fn errors(&self) -> &Vec<String> {
         &self.errors
     }
 
@@ -256,6 +262,67 @@ impl<'a> Parser<'a> {
         }
 
         Stmt::BlockStatement { stmts }
+    }
+
+    fn parse_function_parameters(&mut self) -> Vec<Box<Expr>> {
+        let mut idents = vec![];
+
+        if self.peek_token_is(&Token::RPAREN) {
+            self.next_token();
+            return idents;
+        }
+
+        self.next_token();
+
+        let Token::IDENT(ref string) = self.cur_token else {
+            return vec![Box::new(Expr::Nil)];
+        };
+        let ident = Expr::Identifier {
+            name: string.clone(),
+        };
+        idents.push(Box::new(ident));
+
+        while self.peek_token_is(&Token::COMMA) {
+            self.next_token();
+            self.next_token();
+            let Token::IDENT(ref string) = self.cur_token else {
+                return vec![Box::new(Expr::Nil)];
+            };
+            let ident = Expr::Identifier {
+                name: string.clone(),
+            };
+            idents.push(Box::new(ident));
+        }
+
+        if !self.expect_peek(&Token::RPAREN) {
+            return vec![Box::new(Expr::Nil)];
+        }
+
+        idents
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Box<Expr>> {
+        let mut args = vec![];
+
+        if self.peek_token_is(&Token::RPAREN) {
+            self.next_token();
+            return args;
+        }
+
+        self.next_token();
+        args.push(Box::new(self.parse_expression(Prec::LOWEST)));
+
+        while self.peek_token_is(&Token::COMMA) {
+            self.next_token();
+            self.next_token();
+            args.push(Box::new(self.parse_expression(Prec::LOWEST)));
+        }
+
+        if !self.expect_peek(&Token::RPAREN) {
+            return vec![Box::new(Expr::Nil)];
+        }
+
+        args
     }
 }
 
@@ -380,5 +447,29 @@ fn parse_if_expression(parser: &mut Parser) -> Expr {
         condition,
         consequence,
         alternative,
+    }
+}
+
+fn parse_function_literal(parser: &mut Parser) -> Expr {
+    if !parser.expect_peek(&Token::LPAREN) {
+        return Expr::Nil;
+    }
+
+    let parameters = parser.parse_function_parameters();
+
+    if !parser.expect_peek(&Token::LBRACE) {
+        return Expr::Nil;
+    }
+
+    Expr::FunctionLiteral {
+        parameters,
+        body: Box::new(parser.parse_block_statement()),
+    }
+}
+
+fn parse_call_expression(parser: &mut Parser, function: Expr) -> Expr {
+    Expr::CallExpression {
+        function: Box::new(function),
+        arguments: parser.parse_call_arguments(),
     }
 }

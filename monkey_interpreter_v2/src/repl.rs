@@ -1,4 +1,4 @@
-use crate::{lexer, token::Token};
+use crate::{ast::Node, lexer::Lexer, parser::Parser};
 use std::io::{self, Write};
 
 const PROMPT: &str = ">> ";
@@ -13,12 +13,20 @@ pub fn start() {
             .read_line(&mut buffer)
             .expect("Failed to read in line");
 
-        let mut l = lexer::Lexer::new(&buffer);
-        let mut tok = l.next_token();
-        while tok != Token::EOF {
-            println!("{:?}", tok);
-            tok = l.next_token();
+        let l = Lexer::new(&buffer);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        if p.errors().len() != 0 {
+            print_parser_errors(p.errors());
+            continue;
         }
+
+        println!("{}", program.string());
+
         buffer.clear();
     }
+}
+
+fn print_parser_errors(errors: &Vec<String>) {
+    errors.iter().for_each(|m| println!("\t{m}"));
 }

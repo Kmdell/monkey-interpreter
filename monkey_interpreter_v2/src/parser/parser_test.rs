@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expr, Node, Program, Stmt},
+    ast::{Expr, Node, Stmt},
     lexer::Lexer,
     token::Str,
 };
@@ -14,35 +14,36 @@ enum Expected {
 
 #[test]
 fn test_let_statements() {
-    let test = vec!["x", "y", "foobar"];
+    let tests = vec![
+        ("let x = 5;", "x", Expected::Int(5)),
+        ("let y = true", "y", Expected::Boolean(true)),
+        ("let foobar = y", "foobar", Expected::String("y".into())),
+    ];
 
-    let input = "
-let x = 5;
-let y = 10;
-let foobar = 838384;
-"
-    .to_string();
+    for tt in tests {
+        let l = Lexer::new(tt.0);
+        let mut p = Parser::new(l);
 
-    let l = Lexer::new(&input);
-    let mut p = Parser::new(l);
+        let prog = p.parse_program();
+        check_parser_errors(&p);
 
-    let prog = p.parse_program();
-    check_parser_errors(&p);
+        if prog.stmts.len() == 0 {
+            panic!("parse_program returned empty");
+        }
 
-    if prog.stmts.len() == 0 {
-        panic!("parse_program returned empty");
-    }
+        if prog.stmts.len() != 1 {
+            panic!(
+                "program stmts does not contain 3 statements. got={}",
+                prog.stmts.len()
+            );
+        }
 
-    if prog.stmts.len() != 3 {
-        panic!(
-            "program stmts does not contain 3 statements. got={}",
-            prog.stmts.len()
-        );
-    }
+        test_let_statement(&prog.stmts[0], tt.1);
 
-    for (i, tt) in test.iter().enumerate() {
-        let stmt = &prog.stmts[i];
-        test_let_statement(stmt, *tt);
+        let Stmt::LetStatement { ref value, .. } = prog.stmts[0] else {
+            panic!("Expected LetStatement got={:?}", prog.stmts[0]);
+        };
+        test_literal_expression(value, tt.2);
     }
 }
 
@@ -297,6 +298,15 @@ fn test_operator_precedence_parsing() {
         ("2 / (5 + 5)", "(2 / (5 + 5))"),
         ("-(5 + 5)", "(-(5 + 5))"),
         ("!(true == true)", "(!(true == true))"),
+        ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+        (
+            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+        ),
+        (
+            "add(a + b + c * d / f + g)",
+            "add((((a + b) + ((c * d) / f)) + g))",
+        ),
     ];
 
     for tt in tests {
@@ -476,6 +486,159 @@ fn test_if_else_expression() {
     };
 
     test_identifier(expr, "y");
+}
+
+#[test]
+fn test_function_literal() {
+    let input = "fn(x, y) { x + y };";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    if prog.stmts.len() != 1 {
+        panic!(
+            "program.stmts does not contain {}, got={}",
+            1,
+            prog.stmts.len()
+        );
+    }
+
+    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+        panic!(
+            "prog.stmts[0] is not ExpressionStatement. got={:?}",
+            prog.stmts[0]
+        );
+    };
+
+    let Expr::FunctionLiteral { parameters, body } = expr else {
+        panic!("Expression is not an FunctionLiteral. got={:?}", expr);
+    };
+
+    if parameters.len() != 2 {
+        panic!(
+            "function literal parameters wrong. want 2, got={}",
+            parameters.len()
+        );
+    }
+
+    test_literal_expression(&parameters[0], Expected::String("x".into()));
+    test_literal_expression(&parameters[1], Expected::String("y".into()));
+
+    let Stmt::BlockStatement { ref stmts } = **body else {
+        panic!("function body is not a BlockStatement. got={:?}", body);
+    };
+
+    if stmts.len() != 1 {
+        panic!("function.body.stmts does not have 1. got={}", stmts.len());
+    }
+
+    let Stmt::ExpressionStatement { ref expr, .. } = *stmts[0] else {
+        panic!(
+            "function body stmt is not ExpressionStatement. got={:?}",
+            stmts[0]
+        );
+    };
+
+    test_infix_expression(
+        expr,
+        Expected::String("x".into()),
+        "+",
+        Expected::String("y".into()),
+    );
+}
+
+#[test]
+fn test_function_parameters_parsing() {
+    let tests = vec![
+        ("fn() {}", vec![]),
+        ("fn(x) {}", vec!["x"]),
+        ("fn(x, y, z) {}", vec!["x", "y", "z"]),
+    ];
+
+    for tt in tests {
+        let l = Lexer::new(tt.0);
+        let mut p = Parser::new(l);
+
+        let prog = p.parse_program();
+        check_parser_errors(&p);
+
+        if prog.stmts.len() != 1 {
+            panic!(
+                "program.stmts does not contain {}, got={}",
+                1,
+                prog.stmts.len()
+            );
+        }
+
+        let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+            panic!(
+                "prog.stmts[0] is not an ExpressionStatement. got={:?}",
+                prog.stmts[0]
+            );
+        };
+        let Expr::FunctionLiteral { parameters, .. } = expr else {
+            panic!("expr is not a FunctionLiteral. got={:?}", expr);
+        };
+
+        if parameters.len() != tt.1.len() {
+            panic!(
+                "length of parameters wrong. want={}. got={}",
+                tt.1.len(),
+                parameters.len()
+            );
+        }
+
+        for (i, ident) in tt.1.iter().enumerate() {
+            test_literal_expression(&(*parameters[i]), Expected::String((*ident).to_string()))
+        }
+    }
+}
+
+#[test]
+fn test_call_expression_parsing() {
+    let input = "add(1, 2 * 3, 4 + 5);";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    if prog.stmts.len() != 1 {
+        panic!(
+            "program.stmts does not contain {}, got={}",
+            1,
+            prog.stmts.len()
+        );
+    }
+
+    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+        panic!(
+            "prog.stmts[0] is not an ExpressionStatement. got={:?}",
+            prog.stmts[0]
+        );
+    };
+
+    let Expr::CallExpression {
+        function,
+        arguments,
+    } = expr
+    else {
+        panic!("expr is not CallExpression. got={:?}", expr);
+    };
+
+    test_literal_expression(function, Expected::String("add".into()));
+
+    if arguments.len() != 3 {
+        panic!("wrong length of arguments. want=3, got={}", arguments.len());
+    }
+
+    test_literal_expression(&arguments[0], Expected::Int(1));
+    test_infix_expression(&arguments[1], Expected::Int(2), "*", Expected::Int(3));
+    test_infix_expression(&arguments[2], Expected::Int(4), "+", Expected::Int(5));
 }
 
 fn test_let_statement(stmt: &Stmt, literal: &str) {

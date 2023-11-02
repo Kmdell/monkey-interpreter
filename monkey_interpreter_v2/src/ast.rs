@@ -50,6 +50,14 @@ pub enum Expr {
         consequence: Box<Stmt>,
         alternative: Box<Stmt>,
     },
+    FunctionLiteral {
+        parameters: Vec<Box<Expr>>,
+        body: Box<Stmt>,
+    },
+    CallExpression {
+        function: Box<Expr>,
+        arguments: Vec<Box<Expr>>,
+    },
     Nil,
 }
 
@@ -131,6 +139,8 @@ impl Node for Expr {
                 "false"
             }
             Self::IfExpression { .. } => "if",
+            Self::FunctionLiteral { .. } => "fn",
+            Self::CallExpression { .. } => "(",
             _ => "",
         }
     }
@@ -173,7 +183,31 @@ impl Node for Expr {
 
                 buf
             }
+            Self::FunctionLiteral { parameters, body } => {
+                let mut buf = String::from(self.token_literal());
 
+                let mut strings = vec![];
+                parameters.iter().for_each(|s| strings.push(s.string()));
+
+                buf.push_str("(");
+                buf.push_str(&(strings.join(", ") + ") "));
+                buf.push_str(&body.string());
+
+                buf
+            }
+            Self::CallExpression {
+                function,
+                arguments,
+            } => {
+                let mut buf = String::new();
+
+                let strings: Vec<String> = arguments.iter().map(|s| s.string()).collect();
+
+                buf.push_str(&(function.string() + "("));
+                buf.push_str(&(strings.join(", ") + ")"));
+
+                buf
+            }
             _ => String::from("Not Implemented"),
         }
     }
