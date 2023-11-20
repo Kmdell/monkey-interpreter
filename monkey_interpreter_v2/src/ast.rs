@@ -1,29 +1,38 @@
-use crate::token::{Str, Token};
+use crate::token::Str;
 
 #[cfg(test)]
 mod ast_test;
 
-pub trait Node {
+pub trait TNode {
     fn token_literal(&self) -> &str;
     fn string(&self) -> String;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Program {
-    pub stmts: Vec<Stmt>,
+    pub stmts: Vec<Node>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Stmt {
-    // Requires a Token::LET
-    LetStatement { ident: Expr, value: Expr },
-    // Requires a Token::Return
-    ReturnStatement { value: Expr },
-    ExpressionStatement { token: Token, expr: Expr },
-    BlockStatement { stmts: Vec<Box<Stmt>> },
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Node {
+    Statement(Box<Stmt>),
+    Expression(Box<Expr>),
+    Program(Box<Program>),
     Nil,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Stmt {
+    // Requires a Token::LET
+    LetStatement { ident: Node, value: Node },
+    // Requires a Token::Return
+    ReturnStatement { value: Node },
+    ExpressionStatement { expr: Node },
+    BlockStatement { stmts: Vec<Node> },
+    Nil,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expr {
     Identifier {
         name: Str,
@@ -32,40 +41,64 @@ pub enum Expr {
         value: (Str, i64),
     },
     PrefixExpression {
-        token: Token,
         operator: Str,
-        right: Box<Expr>,
+        right: Node,
     },
     InfixExpression {
-        token: Token,
-        left: Box<Expr>,
+        left: Node,
         operator: Str,
-        right: Box<Expr>,
+        right: Node,
     },
     Boolean {
         value: bool,
     },
     IfExpression {
-        condition: Box<Expr>,
-        consequence: Box<Stmt>,
-        alternative: Box<Stmt>,
+        condition: Node,
+        consequence: Node,
+        alternative: Node,
     },
     FunctionLiteral {
-        parameters: Vec<Box<Expr>>,
-        body: Box<Stmt>,
+        parameters: Vec<Node>,
+        body: Node,
     },
     CallExpression {
-        function: Box<Expr>,
-        arguments: Vec<Box<Expr>>,
+        function: Node,
+        arguments: Vec<Node>,
+    },
+    StringLiteral {
+        value: Str,
+    },
+    ArrayLiteral {
+        elements: Vec<Node>,
+    },
+    IndexExpression {
+        left: Node,
+        index: Node,
     },
     Nil,
 }
 
-impl Node for Program {
+impl TNode for Node {
     fn token_literal(&self) -> &str {
-        "program"
+        match self {
+            Self::Program(prog) => prog.token_literal(),
+            Self::Statement(stmt) => stmt.token_literal(),
+            Self::Expression(expr) => expr.token_literal(),
+            Self::Nil => "Nil",
+        }
     }
 
+    fn string(&self) -> String {
+        match self {
+            Self::Program(prog) => prog.string(),
+            Self::Statement(stmt) => stmt.string(),
+            Self::Expression(expr) => expr.string(),
+            Self::Nil => self.token_literal().into(),
+        }
+    }
+}
+
+impl TNode for Program {
     fn string(&self) -> String {
         let mut buf = String::new();
 
@@ -75,23 +108,18 @@ impl Node for Program {
 
         buf
     }
+
+    fn token_literal(&self) -> &str {
+        "program"
+    }
 }
 
-impl Node for Stmt {
+impl TNode for Stmt {
     fn token_literal(&self) -> &str {
         match self {
             Self::LetStatement { .. } => "let",
             Self::ReturnStatement { .. } => "return",
-            Self::ExpressionStatement { token, .. } => match token {
-                Token::LT => "<",
-                Token::GT => ">",
-                Token::EQ => "==",
-                Token::PLUS => "+",
-                Token::SLASH => "/",
-                Token::MINUS => "-",
-                Token::ASTERICK => "*",
-                _ => todo!("Need to implement for {:?}", token),
-            },
+            Self::ExpressionStatement { .. } => "expression",
             Self::BlockStatement { .. } => "{",
             _ => "",
         }
@@ -123,7 +151,7 @@ impl Node for Stmt {
     }
 }
 
-impl Node for Expr {
+impl TNode for Expr {
     fn token_literal(&self) -> &str {
         match self {
             Self::Identifier { name } => &(*name),
@@ -141,6 +169,9 @@ impl Node for Expr {
             Self::IfExpression { .. } => "if",
             Self::FunctionLiteral { .. } => "fn",
             Self::CallExpression { .. } => "(",
+            Self::StringLiteral { value } => &(*value),
+            Self::ArrayLiteral { .. } => "[",
+            Self::IndexExpression { .. } => "[",
             _ => "",
         }
     }
@@ -175,8 +206,11 @@ impl Node for Expr {
                 let mut buf = String::from(self.token_literal());
 
                 buf.push_str(&(condition.string() + " " + &consequence.string()));
+                let Node::Statement(alt) = alternative else {
+                    return buf + "}";
+                };
 
-                if **alternative != Stmt::Nil {
+                if **alt != Stmt::Nil {
                     buf.push_str("else ");
                     buf.push_str(&alternative.string());
                 }
@@ -207,6 +241,15 @@ impl Node for Expr {
                 buf.push_str(&(strings.join(", ") + ")"));
 
                 buf
+            }
+            Self::StringLiteral { .. } => String::from(self.token_literal()),
+            Self::ArrayLiteral { elements } => {
+                let entities: Vec<String> = elements.iter().map(|elem| elem.string()).collect();
+
+                String::from("[") + &entities.join(", ") + "]"
+            }
+            Self::IndexExpression { left, index } => {
+                String::from("(") + &left.string() + "[" + &index.string() + "])"
             }
             _ => String::from("Not Implemented"),
         }

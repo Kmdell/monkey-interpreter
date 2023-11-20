@@ -76,6 +76,14 @@ fn test_next_token() {
         Token::NOTEQ,
         Token::INT("9".into()),
         Token::SEMICOLON,
+        Token::STRING("foobar".into()),
+        Token::STRING("foo bar".into()),
+        Token::LBRACE,
+        Token::INT("1".into()),
+        Token::COMMA,
+        Token::INT("2".into()),
+        Token::RBRACE,
+        Token::SEMICOLON,
         Token::EOF,
     ];
 
@@ -98,6 +106,9 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;
+\"foobar\"
+\"foo bar\"
+[1, 2];
 ";
 
     let mut l = lexer::Lexer::new(input);

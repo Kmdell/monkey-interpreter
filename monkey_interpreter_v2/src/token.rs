@@ -9,6 +9,7 @@ pub enum Token {
 
     IDENT(Str),
     INT(Str),
+    STRING(Str),
 
     ASSIGN,
     PLUS,

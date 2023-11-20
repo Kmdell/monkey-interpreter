@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    ast::{Expr, Program, Stmt},
+    ast::{Expr, Node, Program, Stmt},
     lexer::Lexer,
     token::{Str, Token},
 };
@@ -25,6 +25,7 @@ enum Prec {
     PRODUCT,
     PREFIX,
     CALL,
+    INDEX,
 }
 
 pub struct Parser<'a> {
@@ -59,11 +60,13 @@ impl<'a> Parser<'a> {
                 (Token::SLASH, Prec::PRODUCT),
                 (Token::ASTERICK, Prec::PRODUCT),
                 (Token::LPAREN, Prec::CALL),
+                (Token::LBRACE, Prec::INDEX),
             ]),
         };
 
         p.register_prefix(&Token::IDENT("".into()), Rc::new(parse_identifier));
         p.register_prefix(&Token::INT("".into()), Rc::new(parse_integer_literal));
+        p.register_prefix(&Token::STRING("".into()), Rc::new(parse_string_literal));
         p.register_prefix(&Token::BANG, Rc::new(parse_prefix_expression));
         p.register_prefix(&Token::MINUS, Rc::new(parse_prefix_expression));
         p.register_prefix(&Token::TRUE, Rc::new(parse_boolean));
@@ -71,6 +74,7 @@ impl<'a> Parser<'a> {
         p.register_prefix(&Token::LPAREN, Rc::new(parse_grouped_expression));
         p.register_prefix(&Token::IF, Rc::new(parse_if_expression));
         p.register_prefix(&Token::FUNCTION, Rc::new(parse_function_literal));
+        p.register_prefix(&Token::LBRACE, Rc::new(parse_array_literal));
 
         p.register_infix(&Token::PLUS, Rc::new(parse_infix_expression));
         p.register_infix(&Token::MINUS, Rc::new(parse_infix_expression));
@@ -81,6 +85,7 @@ impl<'a> Parser<'a> {
         p.register_infix(&Token::LT, Rc::new(parse_infix_expression));
         p.register_infix(&Token::GT, Rc::new(parse_infix_expression));
         p.register_infix(&Token::LPAREN, Rc::new(parse_call_expression));
+        p.register_infix(&Token::LBRACE, Rc::new(parse_index_expression));
 
         p
     }
@@ -96,7 +101,7 @@ impl<'a> Parser<'a> {
         while self.cur_token != Token::EOF {
             let stmt: Stmt = self.parse_statement();
             if stmt != Stmt::Nil {
-                prog.stmts.push(stmt);
+                prog.stmts.push(Node::Statement(Box::new(stmt)));
             }
             self.next_token();
         }
@@ -120,7 +125,7 @@ impl<'a> Parser<'a> {
         let Token::IDENT(ref val) = self.cur_token else {
             return Stmt::Nil;
         };
-        let ident: Expr = Expr::Identifier { name: val.clone() };
+        let ident = Node::Expression(Box::new(Expr::Identifier { name: val.clone() }));
 
         if !self.expect_peek(&Token::ASSIGN) {
             return Stmt::Nil;
@@ -128,7 +133,7 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        let value = self.parse_expression(Prec::LOWEST);
+        let value = Node::Expression(Box::new(self.parse_expression(Prec::LOWEST)));
 
         if self.peek_token_is(&Token::SEMICOLON) {
             self.next_token();
@@ -140,7 +145,7 @@ impl<'a> Parser<'a> {
     fn parse_return_stmt(&mut self) -> Stmt {
         self.next_token();
 
-        let value = self.parse_expression(Prec::LOWEST);
+        let value = Node::Expression(Box::new(self.parse_expression(Prec::LOWEST)));
 
         while self.peek_token_is(&Token::SEMICOLON) {
             self.next_token();
@@ -151,8 +156,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_stmt(&mut self) -> Stmt {
         let stmt = Stmt::ExpressionStatement {
-            token: self.cur_token.clone(),
-            expr: self.parse_expression(Prec::LOWEST),
+            expr: Node::Expression(Box::new(self.parse_expression(Prec::LOWEST))),
         };
 
         if self.peek_token_is(&Token::SEMICOLON) {
@@ -166,6 +170,7 @@ impl<'a> Parser<'a> {
         let func = match self.cur_token {
             Token::IDENT(_) => self.prefix_parse_fns.get(&Token::IDENT("".into())),
             Token::INT(_) => self.prefix_parse_fns.get(&Token::INT("".into())),
+            Token::STRING(_) => self.prefix_parse_fns.get(&Token::STRING("".into())),
             _ => self.prefix_parse_fns.get(&self.cur_token),
         };
 
@@ -256,7 +261,7 @@ impl<'a> Parser<'a> {
         while !self.cur_token_is(&Token::RBRACE) && !self.cur_token_is(&Token::EOF) {
             let stmt = self.parse_statement();
             if stmt != Stmt::Nil {
-                stmts.push(Box::new(stmt));
+                stmts.push(Node::Statement(Box::new(stmt)));
             }
             self.next_token();
         }
@@ -264,7 +269,7 @@ impl<'a> Parser<'a> {
         Stmt::BlockStatement { stmts }
     }
 
-    fn parse_function_parameters(&mut self) -> Vec<Box<Expr>> {
+    fn parse_function_parameters(&mut self) -> Vec<Node> {
         let mut idents = vec![];
 
         if self.peek_token_is(&Token::RPAREN) {
@@ -275,54 +280,58 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let Token::IDENT(ref string) = self.cur_token else {
-            return vec![Box::new(Expr::Nil)];
+            return vec![Node::Nil];
         };
         let ident = Expr::Identifier {
             name: string.clone(),
         };
-        idents.push(Box::new(ident));
+        idents.push(Node::Expression(Box::new(ident)));
 
         while self.peek_token_is(&Token::COMMA) {
             self.next_token();
             self.next_token();
             let Token::IDENT(ref string) = self.cur_token else {
-                return vec![Box::new(Expr::Nil)];
+                return vec![Node::Nil];
             };
             let ident = Expr::Identifier {
                 name: string.clone(),
             };
-            idents.push(Box::new(ident));
+            idents.push(Node::Expression(Box::new(ident)));
         }
 
         if !self.expect_peek(&Token::RPAREN) {
-            return vec![Box::new(Expr::Nil)];
+            return vec![Node::Nil];
         }
 
         idents
     }
 
-    fn parse_call_arguments(&mut self) -> Vec<Box<Expr>> {
-        let mut args = vec![];
+    fn parse_expression_list(&mut self, token: Token) -> Vec<Node> {
+        let mut list = vec![];
 
-        if self.peek_token_is(&Token::RPAREN) {
+        if self.peek_token_is(&token) {
             self.next_token();
-            return args;
+            return list;
         }
 
         self.next_token();
-        args.push(Box::new(self.parse_expression(Prec::LOWEST)));
+        list.push(Node::Expression(Box::new(
+            self.parse_expression(Prec::LOWEST),
+        )));
 
         while self.peek_token_is(&Token::COMMA) {
             self.next_token();
             self.next_token();
-            args.push(Box::new(self.parse_expression(Prec::LOWEST)));
+            list.push(Node::Expression(Box::new(
+                self.parse_expression(Prec::LOWEST),
+            )));
         }
 
-        if !self.expect_peek(&Token::RPAREN) {
-            return vec![Box::new(Expr::Nil)];
+        if !self.expect_peek(&token) {
+            return vec![];
         }
 
-        args
+        list
     }
 }
 
@@ -349,9 +358,20 @@ fn parse_integer_literal(parser: &mut Parser) -> Expr {
     Expr::Nil
 }
 
+fn parse_string_literal(parser: &mut Parser) -> Expr {
+    let Token::STRING(value) = &parser.cur_token else {
+        parser
+            .errors
+            .push(format!("could not parse {:?} as string", parser.cur_token));
+        return Expr::Nil;
+    };
+    Expr::StringLiteral {
+        value: value.clone(),
+    }
+}
+
 fn parse_prefix_expression(parser: &mut Parser) -> Expr {
     let operator: Str;
-    let cur = parser.cur_token.clone();
 
     match parser.cur_token {
         Token::BANG => operator = "!".into(),
@@ -362,36 +382,14 @@ fn parse_prefix_expression(parser: &mut Parser) -> Expr {
     parser.next_token();
 
     Expr::PrefixExpression {
-        token: cur,
         operator,
-        right: Box::new(parser.parse_expression(Prec::PREFIX)),
+        right: Node::Expression(Box::new(parser.parse_expression(Prec::PREFIX))),
     }
 }
 
-fn parse_infix_expression(parser: &mut Parser, left: Expr) -> Expr {
-    let operator: Str;
-    let cur_token = parser.cur_token.clone();
-
-    match parser.cur_token {
-        Token::PLUS => operator = "+".into(),
-        Token::MINUS => operator = "-".into(),
-        Token::ASTERICK => operator = "*".into(),
-        Token::SLASH => operator = "/".into(),
-        Token::LT => operator = "<".into(),
-        Token::GT => operator = ">".into(),
-        Token::EQ => operator = "==".into(),
-        Token::NOTEQ => operator = "!=".into(),
-        _ => return Expr::Nil,
-    }
-    let prec = parser.cur_precedence();
-
-    parser.next_token();
-
-    Expr::InfixExpression {
-        token: cur_token,
-        left: Box::new(left),
-        operator,
-        right: Box::new(parser.parse_expression(prec)),
+fn parse_array_literal(parser: &mut Parser) -> Expr {
+    Expr::ArrayLiteral {
+        elements: parser.parse_expression_list(Token::RBRACE),
     }
 }
 
@@ -413,43 +411,6 @@ fn parse_grouped_expression(parser: &mut Parser) -> Expr {
     expr
 }
 
-fn parse_if_expression(parser: &mut Parser) -> Expr {
-    if !parser.expect_peek(&Token::LPAREN) {
-        return Expr::Nil;
-    }
-
-    parser.next_token();
-
-    let condition = Box::new(parser.parse_expression(Prec::LOWEST));
-
-    if !parser.expect_peek(&Token::RPAREN) {
-        return Expr::Nil;
-    }
-
-    if !parser.expect_peek(&Token::LBRACE) {
-        return Expr::Nil;
-    }
-
-    let consequence = Box::new(parser.parse_block_statement());
-
-    let mut alternative: Box<Stmt> = Box::new(Stmt::Nil);
-    if parser.peek_token_is(&Token::ELSE) {
-        parser.next_token();
-
-        if !parser.expect_peek(&Token::LBRACE) {
-            return Expr::Nil;
-        }
-
-        alternative = Box::new(parser.parse_block_statement());
-    }
-
-    Expr::IfExpression {
-        condition,
-        consequence,
-        alternative,
-    }
-}
-
 fn parse_function_literal(parser: &mut Parser) -> Expr {
     if !parser.expect_peek(&Token::LPAREN) {
         return Expr::Nil;
@@ -463,13 +424,89 @@ fn parse_function_literal(parser: &mut Parser) -> Expr {
 
     Expr::FunctionLiteral {
         parameters,
-        body: Box::new(parser.parse_block_statement()),
+        body: Node::Statement(Box::new(parser.parse_block_statement())),
+    }
+}
+
+fn parse_if_expression(parser: &mut Parser) -> Expr {
+    if !parser.expect_peek(&Token::LPAREN) {
+        return Expr::Nil;
+    }
+
+    parser.next_token();
+
+    let condition = Node::Expression(Box::new(parser.parse_expression(Prec::LOWEST)));
+
+    if !parser.expect_peek(&Token::RPAREN) {
+        return Expr::Nil;
+    }
+
+    if !parser.expect_peek(&Token::LBRACE) {
+        return Expr::Nil;
+    }
+
+    let consequence = Node::Statement(Box::new(parser.parse_block_statement()));
+
+    let mut alternative = Node::Statement(Box::new(Stmt::Nil));
+    if parser.peek_token_is(&Token::ELSE) {
+        parser.next_token();
+
+        if !parser.expect_peek(&Token::LBRACE) {
+            return Expr::Nil;
+        }
+
+        alternative = Node::Statement(Box::new(parser.parse_block_statement()));
+    }
+
+    Expr::IfExpression {
+        condition,
+        consequence,
+        alternative,
+    }
+}
+
+fn parse_infix_expression(parser: &mut Parser, left: Expr) -> Expr {
+    let operator: Str;
+
+    match parser.cur_token {
+        Token::PLUS => operator = "+".into(),
+        Token::MINUS => operator = "-".into(),
+        Token::ASTERICK => operator = "*".into(),
+        Token::SLASH => operator = "/".into(),
+        Token::LT => operator = "<".into(),
+        Token::GT => operator = ">".into(),
+        Token::EQ => operator = "==".into(),
+        Token::NOTEQ => operator = "!=".into(),
+        _ => return Expr::Nil,
+    }
+    let prec = parser.cur_precedence();
+
+    parser.next_token();
+
+    Expr::InfixExpression {
+        left: Node::Expression(Box::new(left)),
+        operator,
+        right: Node::Expression(Box::new(parser.parse_expression(prec))),
     }
 }
 
 fn parse_call_expression(parser: &mut Parser, function: Expr) -> Expr {
     Expr::CallExpression {
-        function: Box::new(function),
-        arguments: parser.parse_call_arguments(),
+        function: Node::Expression(Box::new(function)),
+        arguments: parser.parse_expression_list(Token::RPAREN),
+    }
+}
+
+fn parse_index_expression(parser: &mut Parser, left: Expr) -> Expr {
+    parser.next_token();
+    let index = parser.parse_expression(Prec::LOWEST);
+
+    if !parser.expect_peek(&Token::RBRACE) {
+        return Expr::Nil;
+    }
+
+    Expr::IndexExpression {
+        left: Node::Expression(Box::new(left)),
+        index: Node::Expression(Box::new(index)),
     }
 }

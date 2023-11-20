@@ -114,6 +114,15 @@ impl<'a> Lexer<'a> {
             '\0' => {
                 tok = Token::EOF;
             }
+            '"' => {
+                tok = Token::STRING(self.read_string());
+            }
+            '[' => {
+                tok = Token::LBRACE;
+            }
+            ']' => {
+                tok = Token::RBRACE;
+            }
             _ => {
                 if is_letter(self.ch) {
                     let ident = self.read_identifier();
@@ -143,6 +152,18 @@ impl<'a> Lexer<'a> {
         let pos = self.pos;
         while is_digit(self.ch) {
             self.read_char();
+        }
+
+        self.input[pos..self.pos].into()
+    }
+
+    fn read_string(&mut self) -> Str {
+        let pos = self.pos + 1;
+        loop {
+            self.read_char();
+            if self.ch == '"' || self.ch == '\0' {
+                break;
+            }
         }
 
         self.input[pos..self.pos].into()

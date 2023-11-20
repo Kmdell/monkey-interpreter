@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expr, Node, Stmt},
+    ast::{Expr, Node, Stmt, TNode},
     lexer::Lexer,
     token::Str,
 };
@@ -40,8 +40,11 @@ fn test_let_statements() {
 
         test_let_statement(&prog.stmts[0], tt.1);
 
-        let Stmt::LetStatement { ref value, .. } = prog.stmts[0] else {
-            panic!("Expected LetStatement got={:?}", prog.stmts[0]);
+        let Node::Statement(ref stmt) = prog.stmts[0] else {
+            panic!("Expected Statement got={:?}", prog.stmts[0]);
+        };
+        let Stmt::LetStatement { ref value, .. } = **stmt else {
+            panic!("Expected LetStatement got={:?}", stmt);
         };
         test_literal_expression(value, tt.2);
     }
@@ -70,7 +73,10 @@ return 993322;
     }
 
     for stmt in &prog.stmts {
-        let Stmt::ReturnStatement { .. } = stmt else {
+        let Node::Statement(stmt) = stmt else {
+            panic!("Expected Statement got={:?}", stmt);
+        };
+        let Stmt::ReturnStatement { .. } = **stmt else {
             panic!("stmt not a Stmt::ReturnStatement, got={:?}", stmt);
         };
         if stmt.token_literal() != "return" {
@@ -98,15 +104,22 @@ fn test_identifier_expression() {
             prog.stmts.len()
         );
     }
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Expected Statement got={:?}", prog.stmts[0]);
+    };
 
-    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
         panic!(
             "prog.stmts[0] is not a ExpressionStatement. got {:?} instead",
-            prog.stmts[0]
+            stmt
         );
     };
 
-    let Expr::Identifier { ref name } = expr else {
+    let Node::Expression(expr) = expr else {
+        panic!("Expected Expression got={:?}", expr);
+    };
+
+    let Expr::Identifier { ref name } = **expr else {
         panic!("exp is not a Identifier. got={:?}", expr);
     };
 
@@ -139,14 +152,22 @@ fn test_integer_literal_expression() {
         );
     }
 
-    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Expected Statement got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
         panic!(
             "program.stmts[0] is not ExpressionStatement. got={:?}",
-            prog.stmts[0]
+            stmt
         );
     };
 
-    let Expr::IntegerLiteral { value } = expr else {
+    let Node::Expression(expr) = expr else {
+        panic!("Expected Statement got={:?}", expr);
+    };
+
+    let Expr::IntegerLiteral { ref value } = **expr else {
         panic!("expr is not IntegerLiteral. got={:?}", expr);
     };
 
@@ -186,17 +207,26 @@ fn test_parsing_prefix_expressions() {
                 prog.stmts.len()
             );
         }
+        let Node::Statement(ref stmt) = prog.stmts[0] else {
+            panic!("Expected Statement got={:?}", prog.stmts[0]);
+        };
 
-        let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+        let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
             panic!(
                 "program.stmts[0] is not a ExpressionStatement. got={:?}",
-                prog.stmts[0]
+                stmt
             );
         };
 
+        let Node::Expression(expr) = expr else {
+            panic!("Expected Statement got={:?}", expr);
+        };
+
         let Expr::PrefixExpression {
-            operator, right, ..
-        } = expr
+            ref operator,
+            ref right,
+            ..
+        } = **expr
         else {
             panic!("stmt is not an PrefixExpression. got={:?}", expr);
         };
@@ -256,14 +286,19 @@ fn test_parsing_infix_expression() {
             );
         }
 
-        let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
-            panic!(
-                "prog.stmts[0] is not ExpressionStatement. got={:?}",
-                prog.stmts[0]
-            );
+        let Node::Statement(ref stmt) = prog.stmts[0] else {
+            panic!("Expected Statement got={:?}", prog.stmts[0]);
         };
 
-        let Expr::InfixExpression { .. } = expr else {
+        let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
+            panic!("stmt is not ExpressionStatement. got={:?}", stmt);
+        };
+
+        let Node::Expression(in_expr) = expr else {
+            panic!("Expected Statement got={:?}", expr);
+        };
+
+        let Expr::InfixExpression { .. } = **in_expr else {
             panic!("expr is not InfixExpression. got={:?}", expr);
         };
 
@@ -307,6 +342,14 @@ fn test_operator_precedence_parsing() {
             "add(a + b + c * d / f + g)",
             "add((((a + b) + ((c * d) / f)) + g))",
         ),
+        (
+            "a * [1, 2, 3, 4][b * c] * d",
+            "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+        ),
+        (
+            "add(a * b[2], b[1], 2 * [1, 2][1])",
+            "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+        ),
     ];
 
     for tt in tests {
@@ -341,14 +384,19 @@ fn test_boolean_expression() {
             );
         }
 
-        let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
-            panic!(
-                "prog.stmts[0] is not ExpressionStatement. got={:?}",
-                prog.stmts[0]
-            );
+        let Node::Statement(ref stmt) = prog.stmts[0] else {
+            panic!("Expected Statement got={:?}", prog.stmts[0]);
         };
 
-        let Expr::Boolean { .. } = expr else {
+        let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
+            panic!("prog.stmts[0] is not ExpressionStatement. got={:?}", stmt);
+        };
+
+        let Node::Expression(in_expr) = expr else {
+            panic!("Expected Statement got={:?}", expr);
+        };
+
+        let Expr::Boolean { .. } = **in_expr else {
             panic!("expr is not Boolean. got={:?}", expr);
         };
 
@@ -374,31 +422,40 @@ fn test_if_expression() {
         );
     }
 
-    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
-        panic!(
-            "prog.stmts[0] is not ExpressionStatement. got={:?}",
-            prog.stmts[0]
-        );
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Expected Statement got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
+        panic!("prog.stmts[0] is not ExpressionStatement. got={:?}", stmt);
+    };
+
+    let Node::Expression(expr) = expr else {
+        panic!("Expected Statement got={:?}", expr);
     };
 
     let Expr::IfExpression {
-        condition,
-        consequence,
-        alternative,
+        ref condition,
+        ref consequence,
+        ref alternative,
         ..
-    } = expr
+    } = **expr
     else {
         panic!("expr is not IfExpression. got={:?}", expr);
     };
 
     test_infix_expression(
-        &(**condition),
+        &condition,
         Expected::String("x".into()),
         "<",
         Expected::String("y".into()),
     );
 
-    let Stmt::BlockStatement { ref stmts } = **consequence else {
+    let Node::Statement(stmt) = consequence else {
+        panic!("Expected Statement got={:?}", consequence);
+    };
+
+    let Stmt::BlockStatement { ref stmts } = **stmt else {
         panic!("consequence is not a BlockStatement");
     };
 
@@ -406,14 +463,22 @@ fn test_if_expression() {
         panic!("consequence is not 1 statement. got={}", stmts.len());
     }
 
-    let Stmt::ExpressionStatement { ref expr, .. } = *stmts[0] else {
-        panic!("stmts[0] is not an ExpressionStatement got={:?}", expr)
+    let Node::Statement(ref stmt) = stmts[0] else {
+        panic!("Expected Statement got={:?}", stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
+        panic!("stmts[0] is not an ExpressionStatement got={:?}", stmt)
     };
 
     test_identifier(expr, "x");
 
-    if **alternative != Stmt::Nil {
-        panic!("expr.alternative was not nil. got={:?}", alternative);
+    let Node::Statement(stmt) = alternative else {
+        panic!("Expected Statement got={:?}", alternative);
+    };
+
+    if **stmt != Stmt::Nil {
+        panic!("expr.alternative was not nil. got={:?}", stmt);
     }
 }
 
@@ -435,45 +500,61 @@ fn test_if_else_expression() {
         );
     }
 
-    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
-        panic!(
-            "prog.stmts[0] is not ExpressionStatement. got={:?}",
-            prog.stmts[0]
-        );
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Expected Statement got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
+        panic!("prog.stmts[0] is not ExpressionStatement. got={:?}", stmt);
+    };
+
+    let Node::Expression(expr) = expr else {
+        panic!("Expected Statement got={:?}", expr);
     };
 
     let Expr::IfExpression {
-        condition,
-        consequence,
-        alternative,
+        ref condition,
+        ref consequence,
+        ref alternative,
         ..
-    } = expr
+    } = **expr
     else {
         panic!("expr is not IfExpression. got={:?}", expr);
     };
 
     test_infix_expression(
-        &(**condition),
+        &condition,
         Expected::String("x".into()),
         "<",
         Expected::String("y".into()),
     );
 
-    let Stmt::BlockStatement { ref stmts } = **consequence else {
+    let Node::Statement(stmt) = consequence else {
+        panic!("Expected Statement got={:?}", consequence);
+    };
+
+    let Stmt::BlockStatement { ref stmts } = **stmt else {
         panic!("consequence is not a BlockStatement");
     };
 
     if stmts.len() != 1 {
         panic!("consequence is not 1 statement. got={}", stmts.len());
     }
+    let Node::Statement(ref stmt) = stmts[0] else {
+        panic!("Expected Statement got={:?}", stmts[0]);
+    };
 
-    let Stmt::ExpressionStatement { ref expr, .. } = *stmts[0] else {
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
         panic!("stmts[0] is not an ExpressionStatement got={:?}", expr)
     };
 
     test_identifier(expr, "x");
 
-    let Stmt::BlockStatement { ref stmts } = **alternative else {
+    let Node::Statement(stmt) = alternative else {
+        panic!("Expected Statement got={:?}", alternative);
+    };
+
+    let Stmt::BlockStatement { ref stmts } = **stmt else {
         panic!("consequence is not a BlockStatement");
     };
 
@@ -481,7 +562,11 @@ fn test_if_else_expression() {
         panic!("consequence is not 1 statement. got={}", stmts.len());
     }
 
-    let Stmt::ExpressionStatement { ref expr, .. } = *stmts[0] else {
+    let Node::Statement(ref stmt) = stmts[0] else {
+        panic!("Expected Statement got={:?}", stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
         panic!("stmts[0] is not an ExpressionStatement got={:?}", expr)
     };
 
@@ -505,15 +590,23 @@ fn test_function_literal() {
             prog.stmts.len()
         );
     }
-
-    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
-        panic!(
-            "prog.stmts[0] is not ExpressionStatement. got={:?}",
-            prog.stmts[0]
-        );
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Expected Statement got={:?}", prog.stmts[0]);
     };
 
-    let Expr::FunctionLiteral { parameters, body } = expr else {
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
+        panic!("prog.stmts[0] is not ExpressionStatement. got={:?}", stmt);
+    };
+
+    let Node::Expression(expr) = expr else {
+        panic!("Expected Statement got={:?}", expr);
+    };
+
+    let Expr::FunctionLiteral {
+        ref parameters,
+        ref body,
+    } = **expr
+    else {
         panic!("Expression is not an FunctionLiteral. got={:?}", expr);
     };
 
@@ -527,15 +620,23 @@ fn test_function_literal() {
     test_literal_expression(&parameters[0], Expected::String("x".into()));
     test_literal_expression(&parameters[1], Expected::String("y".into()));
 
-    let Stmt::BlockStatement { ref stmts } = **body else {
-        panic!("function body is not a BlockStatement. got={:?}", body);
+    let Node::Statement(stmt) = body else {
+        panic!("Expected Statement got={:?}", body);
+    };
+
+    let Stmt::BlockStatement { ref stmts } = **stmt else {
+        panic!("function body is not a BlockStatement. got={:?}", stmt);
     };
 
     if stmts.len() != 1 {
         panic!("function.body.stmts does not have 1. got={}", stmts.len());
     }
 
-    let Stmt::ExpressionStatement { ref expr, .. } = *stmts[0] else {
+    let Node::Statement(ref stmt) = stmts[0] else {
+        panic!("Expected Statement got={:?}", stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
         panic!(
             "function body stmt is not ExpressionStatement. got={:?}",
             stmts[0]
@@ -573,13 +674,22 @@ fn test_function_parameters_parsing() {
             );
         }
 
-        let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+        let Node::Statement(ref stmt) = prog.stmts[0] else {
+            panic!("Expected Statement got={:?}", prog.stmts[0]);
+        };
+
+        let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
             panic!(
                 "prog.stmts[0] is not an ExpressionStatement. got={:?}",
-                prog.stmts[0]
+                stmt
             );
         };
-        let Expr::FunctionLiteral { parameters, .. } = expr else {
+
+        let Node::Expression(expr) = expr else {
+            panic!("Expected Statement got={:?}", expr);
+        };
+
+        let Expr::FunctionLiteral { ref parameters, .. } = **expr else {
             panic!("expr is not a FunctionLiteral. got={:?}", expr);
         };
 
@@ -592,7 +702,7 @@ fn test_function_parameters_parsing() {
         }
 
         for (i, ident) in tt.1.iter().enumerate() {
-            test_literal_expression(&(*parameters[i]), Expected::String((*ident).to_string()))
+            test_literal_expression(&parameters[i], Expected::String((*ident).to_string()))
         }
     }
 }
@@ -615,22 +725,30 @@ fn test_call_expression_parsing() {
         );
     }
 
-    let Stmt::ExpressionStatement { ref expr, .. } = prog.stmts[0] else {
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Expected Statement got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr, .. } = **stmt else {
         panic!(
             "prog.stmts[0] is not an ExpressionStatement. got={:?}",
-            prog.stmts[0]
+            stmt
         );
     };
 
+    let Node::Expression(expr) = expr else {
+        panic!("Expected Statement got={:?}", expr);
+    };
+
     let Expr::CallExpression {
-        function,
-        arguments,
-    } = expr
+        ref function,
+        ref arguments,
+    } = **expr
     else {
         panic!("expr is not CallExpression. got={:?}", expr);
     };
 
-    test_literal_expression(function, Expected::String("add".into()));
+    test_literal_expression(&function, Expected::String("add".into()));
 
     if arguments.len() != 3 {
         panic!("wrong length of arguments. want=3, got={}", arguments.len());
@@ -641,24 +759,127 @@ fn test_call_expression_parsing() {
     test_infix_expression(&arguments[2], Expected::Int(4), "+", Expected::Int(5));
 }
 
-fn test_let_statement(stmt: &Stmt, literal: &str) {
-    if let Stmt::LetStatement { ident, .. } = stmt {
-        if let Expr::Identifier { ref name } = ident {
-            if &(**name) != literal {
-                panic!("LetStmt ident name not {}, got={}", literal, name);
-            }
-            if ident.token_literal() != literal {
-                panic!("Identifier token_literal() not {}, got={}", literal, name);
-            }
-        } else {
-            panic!("ident is not an identifier, got={:?}", ident);
-        }
-    } else {
-        panic!("stmt is not a LetStatement, got={:?}", stmt);
+#[test]
+fn test_string_literal_expression() {
+    let input = "\"hello world\";";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Not a statement, got={:?}", prog.stmts[0])
+    };
+
+    let Stmt::ExpressionStatement { ref expr } = **stmt else {
+        panic!("Not a Expression Stmt, got={:?}", stmt)
+    };
+
+    let Node::Expression(ref expr) = expr else {
+        panic!("Not a Expression, got={:?}", expr);
+    };
+
+    let Expr::StringLiteral { ref value } = **expr else {
+        panic!("Not a StringLiteral, got={:?}", expr);
+    };
+
+    if &(**value) != "hello world" {
+        panic!("Literal value not '{}', got='{}'", "hello world", value)
     }
 }
 
-fn test_literal_expression(expr: &Expr, expected: Expected) {
+#[test]
+fn test_parsing_array_literal() {
+    let input = "[1, 2 * 2, 3 + 3]";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+
+    check_parser_errors(&p);
+
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("The prog stmts is not a statemet");
+    };
+
+    let Stmt::ExpressionStatement { ref expr } = **stmt else {
+        panic!("The stmt is not an expression statement, got={:?}", stmt);
+    };
+
+    let Node::Expression(ref expr) = *expr else {
+        panic!("The node is not an expr, got={:?}", expr);
+    };
+
+    let Expr::ArrayLiteral { ref elements } = **expr else {
+        panic!("The expr is not an ArrayLiteral, got={:?}", expr);
+    };
+
+    if elements.len() != 3 {
+        panic!("len of elements is not 3, got={}", elements.len());
+    }
+
+    test_integer_literal(&elements[0], 1);
+    test_infix_expression(&elements[1], Expected::Int(2), "*", Expected::Int(2));
+    test_infix_expression(&elements[2], Expected::Int(3), "+", Expected::Int(3));
+}
+
+#[test]
+fn test_parsing_index_expressions() {
+    let input = "myArray[1 + 1]";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("program stmt is not a statement, got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr } = **stmt else {
+        panic!("stmt is not an expression stmt, got={:?}", stmt);
+    };
+
+    let Node::Expression(ref expr) = *expr else {
+        panic!("node is not an expression, got={:?}", expr);
+    };
+
+    let Expr::IndexExpression {
+        ref left,
+        ref index,
+    } = **expr
+    else {
+        panic!("expr is not an IndexExpression, got={:?}", expr);
+    };
+
+    test_identifier(left, "myArray");
+    test_infix_expression(index, Expected::Int(1), "+", Expected::Int(1));
+}
+
+fn test_let_statement(node: &Node, literal: &str) {
+    let Node::Statement(stmt) = node else {
+        panic!("node is not a statement, got={:?}", node);
+    };
+    let Stmt::LetStatement { ref ident, .. } = **stmt else {
+        panic!("stmt is not a LetStatement, got={:?}", stmt);
+    };
+    let Node::Expression(expr) = ident else {
+        panic!("node is not an expression, got={:?}", node);
+    };
+    if let Expr::Identifier { ref name } = **expr {
+        if &(**name) != literal {
+            panic!("LetStmt ident name not {}, got={}", literal, name);
+        }
+        if ident.token_literal() != literal {
+            panic!("Identifier token_literal() not {}, got={}", literal, name);
+        }
+    } else {
+        panic!("ident is not an identifier, got={:?}", ident);
+    }
+}
+
+fn test_literal_expression(expr: &Node, expected: Expected) {
     match expected {
         Expected::Int(int) => test_integer_literal(expr, int),
         Expected::String(string) => test_identifier(expr, &string),
@@ -666,9 +887,15 @@ fn test_literal_expression(expr: &Expr, expected: Expected) {
     }
 }
 
-fn test_integer_literal(expr: &Expr, value: i64) {
-    let Expr::IntegerLiteral { value: expr_value } = expr else {
-        panic!("expr is not an IntegerLiteral");
+fn test_integer_literal(node: &Node, value: i64) {
+    let Node::Expression(expr) = node else {
+        panic!("node is not an expression, got={:?}", node);
+    };
+    let Expr::IntegerLiteral {
+        value: ref expr_value,
+    } = **expr
+    else {
+        panic!("expr is not an IntegerLiteral, got={:?}", expr);
     };
 
     if expr_value.1 != value {
@@ -683,13 +910,16 @@ fn test_integer_literal(expr: &Expr, value: i64) {
     }
 }
 
-fn test_infix_expression(expr: &Expr, exp_left: Expected, op: &str, exp_right: Expected) {
+fn test_infix_expression(node: &Node, exp_left: Expected, op: &str, exp_right: Expected) {
+    let Node::Expression(ref expr) = node else {
+        panic!("Node is not an expression, got={:?}", node);
+    };
     let Expr::InfixExpression {
-        left,
-        operator,
-        right,
+        ref left,
+        ref operator,
+        ref right,
         ..
-    } = expr
+    } = **expr
     else {
         panic!("expr is not InfixExpression. got={:?}", expr);
     };
@@ -703,8 +933,11 @@ fn test_infix_expression(expr: &Expr, exp_left: Expected, op: &str, exp_right: E
     test_literal_expression(right, exp_right)
 }
 
-fn test_identifier(expr: &Expr, value: &str) {
-    let Expr::Identifier { name } = expr else {
+fn test_identifier(node: &Node, value: &str) {
+    let Node::Expression(expr) = node else {
+        panic!("node is not an expression, got={:?}", node);
+    };
+    let Expr::Identifier { ref name } = **expr else {
         panic!("expr not an Expr::Identifier. got={:?}", expr);
     };
 
@@ -721,12 +954,15 @@ fn test_identifier(expr: &Expr, value: &str) {
     }
 }
 
-fn test_boolean(expr: &Expr, bool_value: bool) {
-    let Expr::Boolean { value } = expr else {
+fn test_boolean(node: &Node, bool_value: bool) {
+    let Node::Expression(expr) = node else {
+        panic!("node is not an expression, got={:?}", node);
+    };
+    let Expr::Boolean { value } = **expr else {
         panic!("expr not an Expr::Boolean. got={:?}", expr);
     };
 
-    if *value != bool_value {
+    if value != bool_value {
         panic!("ident.value not '{}'. got='{}'", bool_value, value);
     }
 

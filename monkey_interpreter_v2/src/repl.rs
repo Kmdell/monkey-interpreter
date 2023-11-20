@@ -1,10 +1,26 @@
-use crate::{ast::Node, lexer::Lexer, parser::Parser};
-use std::io::{self, Write};
+use crate::{
+    ast::Node,
+    environment::Environment,
+    evaluator::{
+        self,
+        builtins::{self, new_builtins},
+    },
+    lexer::Lexer,
+    parser::Parser,
+};
+use std::{
+    cell::RefCell,
+    io::{self, Write},
+    rc::Rc,
+};
 
 const PROMPT: &str = ">> ";
 
 pub fn start() {
     let mut buffer = String::new();
+    let env = Rc::new(RefCell::new(Environment::new()));
+    let builtins = new_builtins();
+
     loop {
         print!("{} ", PROMPT);
         io::stdout().flush().unwrap();
@@ -18,10 +34,12 @@ pub fn start() {
         let program = p.parse_program();
         if p.errors().len() != 0 {
             print_parser_errors(p.errors());
+            buffer.clear();
             continue;
         }
 
-        println!("{}", program.string());
+        let eval = evaluator::eval(&Node::Program(Box::new(program)), &env, &builtins);
+        println!("{}", eval.inspect());
 
         buffer.clear();
     }
