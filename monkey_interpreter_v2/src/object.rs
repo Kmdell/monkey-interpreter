@@ -4,13 +4,13 @@ use crate::{
     evaluator::builtins::BuiltinFn,
     token::Str,
 };
-use std::{cell::RefCell, collections::BTreeMap, hash::DefaultHasher, hash::Hash, rc::Rc};
-use std::{hash::Hasher, ptr::hash};
-
-pub struct HashPair {
-    key: Box<Object>,
-    value: Box<Object>,
-}
+use std::hash::Hasher;
+use std::{
+    cell::RefCell,
+    collections::{hash_map::DefaultHasher, BTreeMap},
+    hash::Hash,
+    rc::Rc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Object {
