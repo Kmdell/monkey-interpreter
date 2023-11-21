@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashMap},
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 use crate::{object::Object, token::Str};
 

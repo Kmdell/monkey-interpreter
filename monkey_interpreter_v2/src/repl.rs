@@ -1,10 +1,7 @@
 use crate::{
     ast::Node,
     environment::Environment,
-    evaluator::{
-        self,
-        builtins::{self, new_builtins},
-    },
+    evaluator::{self, builtins::new_builtins},
     lexer::Lexer,
     object::Object,
     parser::Parser,
