@@ -118,10 +118,13 @@ impl<'a> Lexer<'a> {
                 tok = Token::STRING(self.read_string());
             }
             '[' => {
-                tok = Token::LBRACE;
+                tok = Token::LBRACKET;
             }
             ']' => {
-                tok = Token::RBRACE;
+                tok = Token::RBRACKET;
+            }
+            ':' => {
+                tok = Token::COLON;
             }
             _ => {
                 if is_letter(self.ch) {

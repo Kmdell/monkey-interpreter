@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 use crate::{
     ast::{Expr, Node, Program, Stmt},
@@ -105,6 +105,7 @@ pub fn eval(node: &Node, env: &Rc<RefCell<Environment>>, builtins: &Builtins) ->
 
                 eval_index_expression(left, index)
             }
+            Expr::HashLiteral { ref pairs } => eval_hash_literal(pairs, env, builtins),
             _ => NULL,
         },
         Node::Statement(ref stmt) => match **stmt {
@@ -346,6 +347,9 @@ fn eval_index_expression(left: Object, right: Object) -> Object {
     if let (Object::Array(ref elems), Object::Integer(int)) = (&left, &right) {
         return eval_array_index_expression(elems, *int);
     }
+    if let Object::Hash(ref hash) = &left {
+        return eval_hash_index_expression(hash, right);
+    }
     new_error(format!("index operator not supported: {:?}", right))
 }
 
@@ -358,6 +362,50 @@ fn eval_array_index_expression(array: &Vec<Object>, index: i64) -> Object {
     }
 
     array[index as usize].clone()
+}
+
+#[inline]
+fn eval_hash_literal(
+    node_pairs: &BTreeMap<Expr, Expr>,
+    env: &Rc<RefCell<Environment>>,
+    builtins: &Builtins,
+) -> Object {
+    let mut pairs = BTreeMap::new();
+
+    for (key, value) in node_pairs.iter() {
+        let key = eval(&Node::Expression(Box::new(key.clone())), env, builtins);
+        if is_error(&key) {
+            return key;
+        }
+
+        let hash_key = key.hash_key();
+        if let Object::Null = hash_key {
+            return new_error(format!("unusable as hash key: {:?}", key));
+        }
+
+        let value = eval(&Node::Expression(Box::new(value.clone())), env, builtins);
+        if is_error(&value) {
+            return value;
+        }
+
+        pairs.insert(hash_key, value);
+    }
+
+    Object::Hash(pairs)
+}
+
+#[inline]
+fn eval_hash_index_expression(hash: &BTreeMap<Object, Object>, right: Object) -> Object {
+    let key = right.hash_key();
+    if let Object::Null = key {
+        return new_error(format!("unusable as hash key: {:?}", right));
+    }
+
+    if let Some(obj) = hash.get(&key) {
+        return obj.clone();
+    }
+
+    NULL
 }
 
 #[inline]

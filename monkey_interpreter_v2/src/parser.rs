@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     mem::{self, swap},
     rc::Rc,
 };
@@ -60,7 +60,7 @@ impl<'a> Parser<'a> {
                 (Token::SLASH, Prec::PRODUCT),
                 (Token::ASTERICK, Prec::PRODUCT),
                 (Token::LPAREN, Prec::CALL),
-                (Token::LBRACE, Prec::INDEX),
+                (Token::LBRACKET, Prec::INDEX),
             ]),
         };
 
@@ -74,7 +74,8 @@ impl<'a> Parser<'a> {
         p.register_prefix(&Token::LPAREN, Rc::new(parse_grouped_expression));
         p.register_prefix(&Token::IF, Rc::new(parse_if_expression));
         p.register_prefix(&Token::FUNCTION, Rc::new(parse_function_literal));
-        p.register_prefix(&Token::LBRACE, Rc::new(parse_array_literal));
+        p.register_prefix(&Token::LBRACKET, Rc::new(parse_array_literal));
+        p.register_prefix(&Token::LBRACE, Rc::new(parse_hash_literal));
 
         p.register_infix(&Token::PLUS, Rc::new(parse_infix_expression));
         p.register_infix(&Token::MINUS, Rc::new(parse_infix_expression));
@@ -85,7 +86,7 @@ impl<'a> Parser<'a> {
         p.register_infix(&Token::LT, Rc::new(parse_infix_expression));
         p.register_infix(&Token::GT, Rc::new(parse_infix_expression));
         p.register_infix(&Token::LPAREN, Rc::new(parse_call_expression));
-        p.register_infix(&Token::LBRACE, Rc::new(parse_index_expression));
+        p.register_infix(&Token::LBRACKET, Rc::new(parse_index_expression));
 
         p
     }
@@ -389,7 +390,7 @@ fn parse_prefix_expression(parser: &mut Parser) -> Expr {
 
 fn parse_array_literal(parser: &mut Parser) -> Expr {
     Expr::ArrayLiteral {
-        elements: parser.parse_expression_list(Token::RBRACE),
+        elements: parser.parse_expression_list(Token::RBRACKET),
     }
 }
 
@@ -465,6 +466,35 @@ fn parse_if_expression(parser: &mut Parser) -> Expr {
     }
 }
 
+fn parse_hash_literal(parser: &mut Parser) -> Expr {
+    let mut pairs = BTreeMap::new();
+
+    while !parser.peek_token_is(&Token::RBRACE) {
+        parser.next_token();
+
+        let key = parser.parse_expression(Prec::LOWEST);
+
+        if !parser.expect_peek(&Token::COLON) {
+            return Expr::Nil;
+        }
+
+        parser.next_token();
+        let value = parser.parse_expression(Prec::LOWEST);
+
+        pairs.insert(key, value);
+
+        if !parser.peek_token_is(&Token::RBRACE) && !parser.expect_peek(&Token::COMMA) {
+            return Expr::Nil;
+        }
+    }
+
+    if !parser.expect_peek(&Token::RBRACE) {
+        return Expr::Nil;
+    }
+
+    Expr::HashLiteral { pairs }
+}
+
 fn parse_infix_expression(parser: &mut Parser, left: Expr) -> Expr {
     let operator: Str;
 
@@ -501,7 +531,7 @@ fn parse_index_expression(parser: &mut Parser, left: Expr) -> Expr {
     parser.next_token();
     let index = parser.parse_expression(Prec::LOWEST);
 
-    if !parser.expect_peek(&Token::RBRACE) {
+    if !parser.expect_peek(&Token::RBRACKET) {
         return Expr::Nil;
     }
 

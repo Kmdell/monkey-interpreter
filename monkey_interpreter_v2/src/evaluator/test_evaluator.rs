@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     ast::{Node, TNode},
@@ -171,6 +171,10 @@ fn test_error_handling() {
         (
             "\"Hello\" - \"World\"",
             "unknown operator: String(\"Hello\") - String(\"World\")",
+        ),
+        (
+            "{\"name\": \"Monkey\"}[fn(x) { x }];",
+            "unusable as hash key: Function([Expression(Identifier { name: \"x\" })], Statement(BlockStatement { stmts: [Statement(ExpressionStatement { expr: Expression(Identifier { name: \"x\" }) })] }), RefCell { value: Environment { store: {}, outer: None } })",
         ),
     ];
 
@@ -368,6 +372,66 @@ fn test_array_index_expression() {
             Expected::Int(int) => test_integer_object(eval, int),
             Expected::Null => test_null_object(eval),
             _ => {}
+        }
+    }
+}
+
+#[test]
+fn test_hash_literals() {
+    let input = "let two = \"two\";
+{
+    \"one\": 10 - 9,
+    \"two\": 1 + 1,
+    \"thr\" + \"ee\": 6 / 2,
+    4: 4,
+    true: 5,
+    false: 6
+}";
+
+    let eval = test_eval(input);
+    let Object::Hash(ref pairs) = eval else {
+        panic!("eval didnt return hash, got={:?}", eval);
+    };
+
+    let expected = vec![
+        (Object::String("one".into()), 1),
+        (Object::String("two".into()), 2),
+        (Object::String("three".into()), 3),
+        (Object::Integer(4), 4),
+        (Object::Boolean(true), 5),
+        (Object::Boolean(false), 6),
+    ];
+
+    if pairs.len() != expected.len() {
+        panic!("hash has wrong num of pairs, got={}", pairs.len());
+    }
+
+    for (exp_key, exp_value) in expected {
+        if let Some(value) = pairs.get(&exp_key.hash_key()) {
+            test_integer_object(value.clone(), exp_value);
+        } else {
+            panic!("No value found in hash for expected key={:?}", exp_key)
+        }
+    }
+}
+
+#[test]
+fn test_hash_index_expressions() {
+    let tests = vec![
+        ("{\"foo\": 5}[\"foo\"]", Expected::Int(5)),
+        ("{\"foo\": 5}[\"bar\"]", Expected::Null),
+        ("let key = \"foo\";{\"foo\": 5}[key]", Expected::Int(5)),
+        ("{}[\"foo\"]", Expected::Null),
+        ("{5: 5}[5]", Expected::Int(5)),
+        ("{true: 5}[true]", Expected::Int(5)),
+        ("{false: 5}[false]", Expected::Int(5)),
+    ];
+
+    for (input, expected) in tests {
+        let eval = test_eval(input);
+        match expected {
+            Expected::Int(int) => test_integer_object(eval, int),
+            _ => test_null_object(eval),
         }
     }
 }

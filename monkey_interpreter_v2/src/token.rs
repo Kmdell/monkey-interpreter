@@ -24,12 +24,15 @@ pub enum Token {
     NOTEQ,
 
     COMMA,
+    COLON,
     SEMICOLON,
 
     LPAREN,
     RPAREN,
     LBRACE,
     RBRACE,
+    LBRACKET,
+    RBRACKET,
 
     FUNCTION,
     LET,

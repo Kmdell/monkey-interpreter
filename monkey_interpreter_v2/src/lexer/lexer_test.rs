@@ -78,12 +78,17 @@ fn test_next_token() {
         Token::SEMICOLON,
         Token::STRING("foobar".into()),
         Token::STRING("foo bar".into()),
-        Token::LBRACE,
+        Token::LBRACKET,
         Token::INT("1".into()),
         Token::COMMA,
         Token::INT("2".into()),
-        Token::RBRACE,
+        Token::RBRACKET,
         Token::SEMICOLON,
+        Token::LBRACE,
+        Token::STRING("foo".into()),
+        Token::COLON,
+        Token::STRING("bar".into()),
+        Token::RBRACE,
         Token::EOF,
     ];
 
@@ -109,6 +114,7 @@ if (5 < 10) {
 \"foobar\"
 \"foo bar\"
 [1, 2];
+{\"foo\" : \"bar\"}
 ";
 
     let mut l = lexer::Lexer::new(input);

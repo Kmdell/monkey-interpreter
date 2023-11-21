@@ -6,6 +6,7 @@ use crate::{
         builtins::{self, new_builtins},
     },
     lexer::Lexer,
+    object::Object,
     parser::Parser,
 };
 use std::{
@@ -39,7 +40,9 @@ pub fn start() {
         }
 
         let eval = evaluator::eval(&Node::Program(Box::new(program)), &env, &builtins);
-        println!("{}", eval.inspect());
+        if eval != Object::Null {
+            println!("{}", eval.inspect());
+        }
 
         buffer.clear();
     }

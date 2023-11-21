@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, HashMap};
+
 use crate::token::Str;
 
 #[cfg(test)]
@@ -8,12 +10,12 @@ pub trait TNode {
     fn string(&self) -> String;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Program {
     pub stmts: Vec<Node>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Node {
     Statement(Box<Stmt>),
     Expression(Box<Expr>),
@@ -21,7 +23,7 @@ pub enum Node {
     Nil,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Stmt {
     // Requires a Token::LET
     LetStatement { ident: Node, value: Node },
@@ -32,7 +34,7 @@ pub enum Stmt {
     Nil,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Expr {
     Identifier {
         name: Str,
@@ -74,6 +76,9 @@ pub enum Expr {
     IndexExpression {
         left: Node,
         index: Node,
+    },
+    HashLiteral {
+        pairs: BTreeMap<Expr, Expr>,
     },
     Nil,
 }
@@ -172,6 +177,7 @@ impl TNode for Expr {
             Self::StringLiteral { value } => &(*value),
             Self::ArrayLiteral { .. } => "[",
             Self::IndexExpression { .. } => "[",
+            Self::HashLiteral { .. } => "{",
             _ => "",
         }
     }
@@ -250,6 +256,13 @@ impl TNode for Expr {
             }
             Self::IndexExpression { left, index } => {
                 String::from("(") + &left.string() + "[" + &index.string() + "])"
+            }
+            Self::HashLiteral { pairs } => {
+                let strings: Vec<String> = pairs
+                    .iter()
+                    .map(|(k, v)| String::from(k.string()) + ":" + &v.string())
+                    .collect();
+                String::from("{") + &strings.join(", ") + "}"
             }
             _ => String::from("Not Implemented"),
         }

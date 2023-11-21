@@ -15,6 +15,7 @@ pub fn new_builtins() -> Builtins {
         ("last".into(), last as fn(Vec<Object>) -> Object),
         ("rest".into(), rest as fn(Vec<Object>) -> Object),
         ("push".into(), push as fn(Vec<Object>) -> Object),
+        ("puts".into(), puts as fn(Vec<Object>) -> Object),
     ] {
         builtins.insert(name, Object::Builtin(func));
     }
@@ -156,4 +157,9 @@ pub fn push(args: Vec<Object>) -> Object {
             ))
         }
     }
+}
+
+pub fn puts(args: Vec<Object>) -> Object {
+    args.iter().for_each(|arg| println!("{}", arg.inspect()));
+    NULL
 }

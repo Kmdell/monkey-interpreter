@@ -1,3 +1,8 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    rc::Rc,
+};
+
 use crate::{
     ast::{Expr, Node, Stmt, TNode},
     lexer::Lexer,
@@ -855,6 +860,133 @@ fn test_parsing_index_expressions() {
 
     test_identifier(left, "myArray");
     test_infix_expression(index, Expected::Int(1), "+", Expected::Int(1));
+}
+
+#[test]
+fn test_parsing_hash_literal_string_keys() {
+    let input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("The program stmt is not a stmt, got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr } = **stmt else {
+        panic!("The stmt is not an ExpressionStatement, got={:?}", stmt);
+    };
+
+    let Node::Expression(ref expr) = *expr else {
+        panic!("The node is not an Expression, got={:?}", expr);
+    };
+
+    let Expr::HashLiteral { ref pairs } = **expr else {
+        panic!("The expr is not a HashLiteral, got={:?}", expr);
+    };
+
+    if pairs.len() != 3 {
+        panic!("hash.pairs has wrong length. got={}", pairs.len());
+    }
+
+    let mut expected: BTreeMap<&str, i64> = BTreeMap::new();
+    for (k, v) in [("one", 1), ("two", 2), ("three", 3)] {
+        expected.insert(k, v);
+    }
+
+    for (key, value) in pairs {
+        let Expr::StringLiteral { value: string } = key else {
+            panic!("key is not an ast.string, got={:?}", key);
+        };
+        let expected = expected
+            .get(&(**string))
+            .expect("There is not expected value for key");
+
+        test_integer_literal(&Node::Expression(Box::new(value.clone())), *expected);
+    }
+}
+
+#[test]
+fn test_parsing_empty_hash_literal() {
+    let input = "{}";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Node is not a statement, got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr } = **stmt else {
+        panic!("stmt is not an ExpressionStmt, got={:?}", stmt);
+    };
+
+    let Node::Expression(ref expr) = *expr else {
+        panic!("node is not an expression, got={:?}", expr);
+    };
+
+    let Expr::HashLiteral { ref pairs } = **expr else {
+        panic!("expr is not a hash literal, got={:?}", expr);
+    };
+
+    if pairs.len() != 0 {
+        panic!("hash.pairs has wrong length, got={}", pairs.len());
+    }
+}
+
+#[test]
+fn test_parsing_hash_literal_with_expressions() {
+    let input = "{ \"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15/5 }";
+
+    let l = Lexer::new(input);
+    let mut p = Parser::new(l);
+    let prog = p.parse_program();
+    check_parser_errors(&p);
+
+    let Node::Statement(ref stmt) = prog.stmts[0] else {
+        panic!("Node is not a statement, got={:?}", prog.stmts[0]);
+    };
+
+    let Stmt::ExpressionStatement { ref expr } = **stmt else {
+        panic!("stmt is not an ExpressionStmt, got={:?}", stmt);
+    };
+
+    let Node::Expression(ref expr) = *expr else {
+        panic!("node is not an expression, got={:?}", expr);
+    };
+
+    let Expr::HashLiteral { ref pairs } = **expr else {
+        panic!("expr is not a hash literal, got={:?}", expr);
+    };
+
+    if pairs.len() != 3 {
+        panic!("hash.pairs has wrong length, got={}", pairs.len());
+    }
+
+    let tests = HashMap::from([
+        ("one", (0, "+", 1)),
+        ("two", (10, "-", 8)),
+        ("three", (15, "/", 5)),
+    ]);
+
+    for (key, v) in pairs {
+        let Expr::StringLiteral { ref value } = key else {
+            panic!("key is not a String literal, got={:?}", key);
+        };
+
+        if let Some(test) = tests.get(&(**value)) {
+            test_infix_expression(
+                &Node::Expression(Box::new(v.clone())),
+                Expected::Int(test.0),
+                test.1,
+                Expected::Int(test.2),
+            )
+        }
+    }
 }
 
 fn test_let_statement(node: &Node, literal: &str) {
